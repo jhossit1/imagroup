@@ -82,7 +82,7 @@
       const r = await fetch(f.action, { method: 'POST', headers: { Accept: 'application/json' }, body: new URLSearchParams(new FormData(f)) });
       const j = await r.json();
       msg.className = 'form-msg ' + (j.ok ? 'ok' : 'err'); msg.textContent = j.message;
-      if (j.ok) { f.reset(); f._t.value = Date.now() - 3000; }
+      if (j.ok) { f.reset(); f._t.value = Date.now() - 3000; if (f.classList.contains('mini')) { msg.textContent = ''; f.classList.add('sent'); setTimeout(() => f.classList.remove('sent'), 6000); } }
     } catch { msg.className = 'form-msg err'; msg.textContent = 'No se pudo enviar. Revisa tu conexión o escríbenos por WhatsApp.'; }
     b.disabled = false;
   }));
@@ -120,5 +120,53 @@
     const b = e.target.closest('button'); if (!b) return;
     tabs.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', x === b));
     let n = 0; document.querySelectorAll('.pf-study li').forEach((li) => { li.hidden = li.dataset.k !== b.dataset.k; if (!li.hidden) li.style.setProperty('--n', n++); });
+  });
+})();
+
+// Interfaz: modo oscuro con haz de luz, barra inferior líquida, palabra cinética y textarea que crece.
+(() => {
+  const root = document.documentElement;
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const tb = document.querySelector('[data-theme-btn]');
+  if (tb) {
+    const sync = () => { const d = root.dataset.theme === 'dark'; tb.setAttribute('aria-pressed', d); tb.setAttribute('aria-label', d ? 'Modo claro' : 'Modo oscuro'); };
+    sync();
+    tb.addEventListener('click', () => {
+      const d = root.dataset.theme !== 'dark';
+      root.classList.add('theme-anim');
+      if (d) root.dataset.theme = 'dark'; else delete root.dataset.theme;
+      try { localStorage.setItem('theme', d ? 'dark' : 'light'); } catch { /* */ }
+      tb.classList.remove('flash'); void tb.offsetWidth; if (d) tb.classList.add('flash');
+      sync(); setTimeout(() => root.classList.remove('theme-anim'), 700);
+    });
+  }
+
+  const tabs = document.querySelector('[data-tabs]');
+  if (tabs) {
+    const links = [...tabs.querySelectorAll('a')];
+    const now = parseInt(tabs.style.getPropertyValue('--i'), 10);
+    let prev = null; try { prev = sessionStorage.getItem('tab'); } catch { /* */ }
+    if (!still && prev !== null && +prev !== now && now >= 0 && +prev >= 0) {
+      tabs.classList.add('no-anim'); tabs.style.setProperty('--i', prev); void tabs.offsetWidth;
+      tabs.classList.remove('no-anim'); requestAnimationFrame(() => tabs.style.setProperty('--i', now));
+    }
+    try { sessionStorage.setItem('tab', now); } catch { /* */ }
+    links.forEach((a, i) => a.addEventListener('click', () => { tabs.style.setProperty('--i', i); try { sessionStorage.setItem('tab', i); } catch { /* */ } }));
+  }
+
+  const word = document.querySelector('[data-kinetic]');
+  if (word && !still) {
+    const ls = [...word.children], kinds = ['k1', 'k2', 'k3'];
+    const tick = () => {
+      const el = ls[Math.floor(Math.random() * ls.length)];
+      if (!el.className) { el.className = kinds[Math.floor(Math.random() * kinds.length)]; setTimeout(() => (el.className = ''), 700 + Math.random() * 600); }
+    };
+    setInterval(tick, 420);
+  }
+
+  document.querySelectorAll('.fl textarea').forEach((t) => {
+    const fit = () => { t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 320) + 'px'; };
+    t.addEventListener('input', fit);
   });
 })();

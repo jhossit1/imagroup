@@ -13,7 +13,7 @@ app.disable('x-powered-by');
 app.use((req, res, next) => {
   res.set({
     'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin', 'X-Frame-Options': 'DENY',
-    'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; form-action 'self'; frame-ancestors 'none'",
+    'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; style-src 'self' https://fonts.googleapis.com; style-src-attr 'unsafe-inline'; font-src https://fonts.gstatic.com; script-src 'self'; form-action 'self'; frame-ancestors 'none'",
   });
   req.cookies = Object.fromEntries((req.headers.cookie || '').split(';').map((c) => c.trim().split('=')).filter((p) => p[0]).map(([k, ...v]) => [k, decodeURIComponent(v.join('='))]));
   next();
@@ -86,7 +86,7 @@ const clean = (v, n) => String(v ?? '').trim().slice(0, n);
 const wantsJson = (req) => (req.get('accept') || '').includes('application/json');
 function notify(lead) {
   const url = settings().notify_webhook;
-  if (url && /^https:\/\//.test(url)) fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: `Nueva solicitud (${lead.kind}) de ${lead.name} · ${lead.phone}`, lead }), signal: AbortSignal.timeout(5000) }).catch(() => {});
+  if (url && /^https:\/\//.test(url)) fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: `Nueva solicitud (${lead.kind}) de ${lead.name || lead.email || ''} · ${lead.phone || lead.email || ''}`, lead }), signal: AbortSignal.timeout(5000) }).catch(() => {});
 }
 
 app.post('/contacto', (req, res) => {
@@ -94,13 +94,13 @@ app.post('/contacto', (req, res) => {
   const b = { kind: ['contacto', 'cotizacion'].includes(req.body.kind) ? req.body.kind : 'contacto', name: clean(req.body.name, 120), phone: clean(req.body.phone, 30),
     email: clean(req.body.email, 120), organization: clean(req.body.organization, 120), subject: clean(req.body.subject, 140), message: clean(req.body.message, 3000) };
   let msg = err;
-  if (!msg && (!b.name || !b.phone || !b.message)) msg = 'Completa nombre, teléfono y tu requerimiento.';
-  if (!msg && b.email && !/^\S+@\S+\.\S+$/.test(b.email)) msg = 'Revisa el correo.';
+  if (!msg && (!b.email || !b.message)) msg = 'Escribe tu correo y lo que necesitas.';
+  if (!msg && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(b.email)) msg = 'Revisa el correo.';
   if (msg === 'spam') return wantsJson(req) ? res.json({ ok: true, message: 'Recibido.' }) : page(res, { body: V.message('Recibido', 'Gracias.') });
   if (msg) return wantsJson(req) ? res.status(400).json({ ok: false, message: msg }) : res.status(400).send(V.layout(settings(), { body: V.message('Revisa el formulario', msg, 'javascript:history.back()') }));
   const r = run('INSERT INTO leads (kind, name, phone, email, organization, subject, message) VALUES (?,?,?,?,?,?,?)', b.kind, b.name, b.phone, b.email, b.organization, b.subject, b.message);
   notify({ id: Number(r.lastInsertRowid), ...b });
-  const ok = 'Solicitud enviada. Te responderemos pronto al teléfono que dejaste.';
+  const ok = 'Recibido. Te responderemos a tu correo.';
   wantsJson(req) ? res.json({ ok: true, message: ok }) : page(res, { title: 'Solicitud enviada', body: V.message('Solicitud enviada', ok) });
 });
 

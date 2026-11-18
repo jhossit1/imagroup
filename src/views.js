@@ -21,7 +21,7 @@ export function layout(s, { title, desc, path = '/', body, theme = '' }) {
 ${s.review_banner === '1' ? '<meta name="robots" content="noindex">' : ''}
 <link rel="icon" href="/img/brand/imagroup.webp"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/site.css?v=6"></head>
+<link rel="stylesheet" href="/css/site.css?v=8"><script src="/js/theme.js?v=7"></script></head>
 <body class="${theme}">
 <a class="skip" href="#main">Saltar al contenido</a>
 ${s.review_banner === '1' ? '<div class="review">Versión de revisión. Los pagos en línea aún no están habilitados: los pedidos se confirman por WhatsApp o teléfono.</div>' : ''}
@@ -30,11 +30,11 @@ ${s.review_banner === '1' ? '<div class="review">Versión de revisión. Los pago
 
   <nav id="nav" class="nav">${nav.map(([u, l]) => `<a href="${u}"${path.startsWith(u) ? ' aria-current="page"' : ''}>${l}</a>`).join('')}
 </nav>
-  <div class="top-act"><a class="cart-link" href="/carrito" aria-label="Ver pedido">${ICON.cart}<b data-cart-count hidden>0</b></a>
+  <div class="top-act"><button class="theme-btn" type="button" aria-label="Modo oscuro" aria-pressed="false" data-theme-btn><span class="tb-knob"></span><svg class="tb-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="tb-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/></svg><span class="tb-beam" aria-hidden="true"></span></button><a class="cart-link" href="/carrito" aria-label="Ver pedido">${ICON.cart}<b data-cart-count hidden>0</b></a>
   <button class="menu-btn" aria-expanded="false" aria-controls="nav"><span></span><span></span><span class="sr">Menú</span></button></div>
 </div></header>
 <main id="main">${body}</main>
-<nav class="mobile-tabs" aria-label="Navegación principal">
+<nav class="mobile-tabs" aria-label="Navegación principal" data-tabs style="--i:${['/', '/servicios', '/tienda', '/contacto'].findIndex((u) => (u === '/' ? path === '/' : path.startsWith(u)))}"><span class="mt-blob" aria-hidden="true"></span>
   <a href="/"${path === '/' ? ' aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"/></svg><span>Inicio</span></a>
   <a href="/servicios"${path.startsWith('/servicios') ? ' aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V8l8-5 8 5v12H4Z"/><path d="M9 20v-7h6v7M4 10h16"/></svg><span>Servicios</span></a>
   <a href="/tienda"${path.startsWith('/tienda') ? ' aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h16l-1 12H5L4 9ZM8 10V7a4 4 0 0 1 8 0v3"/></svg><span>Tienda</span></a>
@@ -50,7 +50,7 @@ ${s.review_banner === '1' ? '<div class="review">Versión de revisión. Los pago
   <p class="fine">© ${new Date().getFullYear()} Imagroup S.A.C. ${s.facebook ? `· <a href="${h(s.facebook)}" rel="noopener">Facebook</a>` : ''}</p>
 </div></footer>
 <a class="wa-float" href="${wa(s.whatsapp, 'Hola, vengo de la web de Imagroup.')}" target="_blank" rel="noopener" aria-label="Escribir por WhatsApp">${ICON.wa}</a>
-<script src="/js/site.js?v=6" defer></script></body></html>`;
+<script src="/js/site.js?v=8" defer></script></body></html>`;
 }
 
 const frame = (src, alt, cls = '', eager = false) =>
@@ -114,7 +114,7 @@ ${contactBand(s)}`;
 
 export function contactBand(s, prefill = {}) {
   return `<section class="contact-band" id="contacto"><div class="wrap contact-in">
-  <div class="reveal"><h2>Cuéntanos qué necesitas</h2><p>Respondemos cotizaciones de servicios y pedidos de equipos. Si prefieres, escríbenos directo.</p>
+  <div class="reveal"><h2>Cuéntanos qué necesitas</h2><p>Solo tu correo y lo que necesitas. Si prefieres, escríbenos directo.</p>
     <ul class="direct">
       <li><a href="${wa(s.whatsapp, prefill.wa || 'Hola, quiero hacer una consulta.')}" target="_blank" rel="noopener">${ICON.wa}WhatsApp ${h(s.phone_1)}</a></li>
       <li><a href="tel:+51${h((s.phone_2 || '').replace(/\D/g, ''))}">${ICON.phone}${h(s.phone_2)}</a></li>
@@ -123,17 +123,17 @@ export function contactBand(s, prefill = {}) {
 }
 
 export function leadForm(prefill = {}) {
-  return `<form class="form reveal" method="post" action="/contacto" novalidate data-form>
-  <input type="hidden" name="kind" value="${h(prefill.kind || 'contacto')}"><input type="hidden" name="_t" value="${Date.now()}">
+  const subj = prefill.subject || '';
+  return `<form class="form mini reveal" method="post" action="/contacto" novalidate data-form>
+  <input type="hidden" name="kind" value="${h(prefill.kind || 'contacto')}"><input type="hidden" name="_t" value="${Date.now()}"><input type="hidden" name="subject" value="${h(subj)}">
   <div class="hp" aria-hidden="true"><label>No llenar <input name="website" tabindex="-1" autocomplete="off"></label></div>
-  <div class="row2"><label>Nombre<input name="name" required maxlength="120" autocomplete="name"></label>
-  <label>Teléfono o WhatsApp<input name="phone" required maxlength="30" inputmode="tel" autocomplete="tel"></label></div>
-  <div class="row2"><label>Correo <i>(opcional)</i><input name="email" type="email" maxlength="120" autocomplete="email"></label>
-  <label>Entidad o empresa <i>(opcional)</i><input name="organization" maxlength="120" autocomplete="organization"></label></div>
-  <label>Tema<input name="subject" maxlength="140" value="${h(prefill.subject || '')}"></label>
-  <label>Tu requerimiento<textarea name="message" required maxlength="3000" rows="4" placeholder="Ubicación, plazo, alcance o cantidades"></textarea></label>
-  <p class="form-msg" role="status" aria-live="polite"></p>
-  <button class="btn" type="submit">Enviar solicitud</button></form>`;
+  ${subj ? `<p class="mini-subj"><span>Sobre</span> ${h(subj)}</p>` : ''}
+  <label class="fl"><input name="email" type="email" required maxlength="120" autocomplete="email" inputmode="email" placeholder=" "><span>Tu correo</span><i aria-hidden="true"></i></label>
+  <label class="fl"><textarea name="message" required maxlength="3000" rows="2" placeholder=" "></textarea><span>¿Qué necesitas?</span><i aria-hidden="true"></i></label>
+  <div class="mini-foot"><p class="form-msg" role="status" aria-live="polite"></p>
+  <button class="btn send" type="submit"><span>Enviar</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+  <div class="mini-ok" aria-hidden="true"><svg viewBox="0 0 52 52"><circle cx="26" cy="26" r="24"/><path d="m15 27 7 7 15-16"/></svg><b>Recibido</b><span>Te responderemos a tu correo.</span></div>
+</form>`;
 }
 
 export function servicesPage(s, co, services) {
@@ -236,8 +236,17 @@ export function projectPage(s, p) {
 }
 
 export function contactPage(s, subject) {
-  return `<section class="page-head wrap"><div><p class="kicker">Contacto</p><h1>Hablemos de tu proyecto o pedido</h1></div></section>
-  ${contactBand(s, { kind: 'contacto', subject })}`;
+  const word = 'CONTACTO';
+  return `<section class="kc"><div class="wrap">
+  <ul class="kc-info">
+    <li><span>Correo</span><a href="mailto:${h(s.email)}">${h(s.email)}</a></li>
+    <li><span>WhatsApp</span><a href="${wa(s.whatsapp, 'Hola, quiero hacer una consulta.')}" target="_blank" rel="noopener">${h(s.phone_1)}</a></li>
+    <li><span>Teléfono</span><a href="tel:+51${h((s.phone_2 || '').replace(/\D/g, ''))}">${h(s.phone_2)}</a></li>
+    <li><span>Ubicación</span>${h(s.city)}</li></ul>
+  <h1 class="kc-word" aria-label="Contacto" data-kinetic>${[...word].map((c, i) => `<span aria-hidden="true" style="--i:${i}">${c}</span>`).join('')}</h1>
+  </div></section>
+  <section class="wrap kc-form"><div class="kc-lead reveal"><h2>Escríbenos en dos líneas</h2><p>Déjanos tu correo y lo que necesitas. Te respondemos con la cotización o la información.</p></div>
+  ${leadForm({ kind: 'contacto', subject })}</section>`;
 }
 
 export function message(title, text, back = '/') {

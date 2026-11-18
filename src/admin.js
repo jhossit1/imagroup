@@ -109,7 +109,7 @@ r.get('/', (req, res) => {
   <a href="/admin/leads?kind=pedido"><b>${c(`SELECT COUNT(*) n FROM leads WHERE kind='pedido'`)}</b>pedidos recibidos</a>
   <div><b>${c(`SELECT COALESCE(SUM(count),0) n FROM pageviews WHERE day >= date('now','-30 days')`)}</b>visitas en 30 días</div>
   <a href="/admin/products"><b>${c('SELECT COUNT(*) n FROM products WHERE visible=1')}</b>productos publicados</a></div>
-  <div class="a-cols"><section class="a-card"><h2>Últimas solicitudes</h2>${leads.length ? `<ul class="a-list">${leads.map((l) => `<li><a href="/admin/leads/${l.id}"><b>${h(l.name)}</b> · ${h(l.kind)} · ${h(l.subject || '')}</a><span class="a-pill s-${h(l.status.replace(' ', '-'))}">${h(l.status)}</span></li>`).join('')}</ul>` : '<p class="a-empty">Aún no hay solicitudes. Aparecerán aquí cuando alguien use el formulario o el carrito.</p>'}</section>
+  <div class="a-cols"><section class="a-card"><h2>Últimas solicitudes</h2>${leads.length ? `<ul class="a-list">${leads.map((l) => `<li><a href="/admin/leads/${l.id}"><b>${h(l.name || l.email)}</b> · ${h(l.kind)} · ${h(l.subject || '')}</a><span class="a-pill s-${h(l.status.replace(' ', '-'))}">${h(l.status)}</span></li>`).join('')}</ul>` : '<p class="a-empty">Aún no hay solicitudes. Aparecerán aquí cuando alguien use el formulario o el carrito.</p>'}</section>
   <section class="a-card"><h2>Visitas por día</h2><p class="a-help">Datos agregados y anónimos: no identifican personas. Solo se conoce a quien envía un formulario.</p>
   ${days.length ? `<div class="a-bars">${days.map((d) => `<span style="--h:${Math.round((d.n / max) * 100)}%" title="${d.day}: ${d.n}"><i>${d.n}</i></span>`).join('')}</div>
   <h3>Páginas más vistas (30 días)</h3><ol class="a-top-pages">${top.map((t) => `<li><span>${h(t.path)}</span><b>${t.n}</b></li>`).join('')}</ol>` : '<p class="a-empty">Sin visitas registradas todavía.</p>'}</section></div>`));
@@ -123,7 +123,7 @@ r.get('/leads', (req, res) => {
   <form class="a-filters"><select name="kind"><option value="">Todo tipo</option>${['contacto', 'cotizacion', 'pedido'].map((k) => `<option ${k === kind ? 'selected' : ''}>${k}</option>`).join('')}</select>
   <select name="status"><option value="">Todo estado</option>${LEAD_STATES.map((k) => `<option ${k === status ? 'selected' : ''}>${k}</option>`).join('')}</select><button class="a-btn ghost">Filtrar</button></form>
   ${rows.length ? `<div class="a-table-wrap"><table class="a-table"><thead><tr><th>N.°</th><th>Fecha</th><th>Tipo</th><th>Nombre</th><th>Teléfono</th><th>Tema / total</th><th>Estado</th></tr></thead><tbody>
-  ${rows.map((l) => `<tr><td><a href="/admin/leads/${l.id}">${l.id}</a></td><td>${h(l.created_at.slice(0, 16))}</td><td>${h(l.kind)}</td><td><a href="/admin/leads/${l.id}">${h(l.name)}</a></td><td>${h(l.phone)}</td>
+  ${rows.map((l) => `<tr><td><a href="/admin/leads/${l.id}">${l.id}</a></td><td>${h(l.created_at.slice(0, 16))}</td><td>${h(l.kind)}</td><td><a href="/admin/leads/${l.id}">${h(l.name || l.email)}</a></td><td>${h(l.phone || '')}</td>
   <td>${l.kind === 'pedido' ? money(l.total_cents) : h(l.subject)}</td><td><span class="a-pill s-${h(l.status.replace(' ', '-'))}">${h(l.status)}</span></td></tr>`).join('')}</tbody></table></div>` : '<p class="a-empty">No hay solicitudes con ese filtro.</p>'}`));
 });
 r.get('/leads.csv', (req, res) => {
@@ -135,10 +135,10 @@ r.get('/leads.csv', (req, res) => {
 r.get('/leads/:id', (req, res, next) => {
   const l = get('SELECT * FROM leads WHERE id = ?', req.params.id); if (!l) return next();
   let items = []; try { items = JSON.parse(l.items || '[]'); } catch { /* */ }
-  const phone = l.phone.replace(/\D/g, ''); const waNum = phone.length === 9 ? '51' + phone : phone;
+  const phone = (l.phone || '').replace(/\D/g, ''); const waNum = phone.length === 9 ? '51' + phone : phone;
   res.send(shell(req, `Solicitud ${l.id}`, `<p><a href="/admin/leads">← Solicitudes</a></p><div class="a-head"><h1>${h(l.kind)} N.° ${l.id}</h1><span class="a-pill s-${h(l.status.replace(' ', '-'))}">${h(l.status)}</span></div>
-  <div class="a-cols"><section class="a-card"><dl class="a-dl"><dt>Fecha</dt><dd>${h(l.created_at)} (UTC)</dd><dt>Nombre</dt><dd>${h(l.name)}</dd>
-  <dt>Teléfono</dt><dd>${h(l.phone)} · <a href="https://wa.me/${h(waNum)}" target="_blank" rel="noopener">Abrir WhatsApp</a></dd>
+  <div class="a-cols"><section class="a-card"><dl class="a-dl"><dt>Fecha</dt><dd>${h(l.created_at)} (UTC)</dd>${l.name ? `<dt>Nombre</dt><dd>${h(l.name)}</dd>` : ''}
+  ${phone ? `<dt>Teléfono</dt><dd>${h(l.phone)} · <a href="https://wa.me/${h(waNum)}" target="_blank" rel="noopener">Abrir WhatsApp</a></dd>` : ''}
   ${l.email ? `<dt>Correo</dt><dd><a href="mailto:${h(l.email)}">${h(l.email)}</a></dd>` : ''}${l.organization ? `<dt>Entidad</dt><dd>${h(l.organization)}</dd>` : ''}
   ${l.subject ? `<dt>Tema</dt><dd>${h(l.subject)}</dd>` : ''}${l.delivery ? `<dt>Entrega</dt><dd>${h(l.delivery)}</dd>` : ''}<dt>Mensaje</dt><dd class="a-pre">${h(l.message)}</dd></dl>
   ${items.length ? `<table class="a-table"><thead><tr><th>Producto</th><th>Cant.</th><th>Subtotal</th></tr></thead><tbody>${items.map((i) => `<tr><td>${h(i.name)}</td><td>${i.qty}</td><td>${money(i.price == null ? null : i.price * i.qty)}</td></tr>`).join('')}
