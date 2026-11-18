@@ -26,7 +26,7 @@ app.use(loadSession);
 
 // Analítica agregada: solo cuenta visitas por ruta y día, sin IP ni identificadores.
 app.use((req, _res, next) => {
-  if (req.method === 'GET' && !req.admin && !/^\/(admin|uploads|img|css|js)|\.\w+$/.test(req.path) && !/bot|crawl|spider/i.test(req.get('user-agent') || ''))
+  if (req.method === 'GET' && !req.admin && !/^\/(admin|uploads|img|css|js|healthz)|\.\w+$/.test(req.path) && !/bot|crawl|spider/i.test(req.get('user-agent') || ''))
     run(`INSERT INTO pageviews (day, path, count) VALUES (date('now'), ?, 1) ON CONFLICT(day, path) DO UPDATE SET count = count + 1`, req.path.slice(0, 120));
   next();
 });

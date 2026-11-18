@@ -48,18 +48,61 @@ const SETTINGS = [
 ];
 const LEAD_STATES = ['nuevo', 'en proceso', 'cotizado', 'confirmado', 'entregado', 'cerrado', 'descartado'];
 
-const shell = (req, title, body) => `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="robots" content="noindex"><title>${h(title)} · Admin Imagroup</title><link rel="stylesheet" href="/css/admin.css?v=2"></head><body>
-${req.admin ? `<header class="a-top"><a href="/admin" class="a-brand">Imagroup · Admin</a><nav>
-<a href="/admin/leads">Solicitudes</a>${Object.entries(ENT).map(([k, e]) => `<a href="/admin/${k}">${e.label}</a>`).join('')}<a href="/admin/ajustes">Ajustes</a><a href="/admin/auditoria">Auditoría</a>
-<form method="post" action="/admin/logout"><input type="hidden" name="_csrf" value="${h(req.csrf)}"><button>Salir</button></form></nav></header>` : ''}
-<main class="a-main">${body}</main><script src="/js/admin.js?v=2" defer></script></body></html>`;
+// Íconos de trazo (24×24) para la navegación del panel.
+const IC = {
+  home: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+  inbox: '<path d="M4 4h16v16H4z"/><path d="M4 14h4l2 3h4l2-3h4"/>',
+  box: '<path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7M12 11v10"/>',
+  tag: '<path d="M3 12V3h9l9 9-9 9z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
+  leaf: '<path d="M5 19C5 10 11 5 20 5c0 9-5 15-14 15"/><path d="M5 20l8-8"/>',
+  folder: '<path d="M3 6h6l2 2h10v11H3z"/>',
+  building: '<path d="M4 21V4h10v17M14 9h6v12M8 8h2M8 12h2M8 16h2M2 21h20"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/>',
+  shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>',
+  out: '<path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/>',
+  ext: '<path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6"/>',
+  dots: '<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.4 1.4M17.6 17.6 19 19M5 19l1.4-1.4M17.6 6.4 19 5"/>',
+  moon: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
+  down: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>', pen: '<path d="M4 20h4L19 9l-4-4L4 16z"/>', x: '<path d="M6 6l12 12M18 6 6 18"/>', in: '<path d="M10 4H5v16h5M14 8l4 4-4 4M18 12H8"/>',
+};
+const ic = (n) => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${IC[n]}</svg>`;
+const NAV = [['/admin', 'Inicio', 'home'], ['/admin/leads', 'Solicitudes', 'inbox'], ['/admin/products', 'Productos', 'box'], ['/admin/categories', 'Categorías', 'tag'],
+  ['/admin/services', 'Servicios', 'leaf'], ['/admin/projects', 'Portafolio', 'folder'], ['/admin/companies', 'Empresas', 'building'], ['/admin/ajustes', 'Ajustes', 'gear'], ['/admin/auditoria', 'Auditoría', 'shield']];
+const TABS = ['/admin', '/admin/leads', '/admin/products', '/admin/services'];
+
+const shell = (req, title, body) => {
+  const head = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex"><meta name="color-scheme" content="light dark"><title>${h(title)} · Admin Imagroup</title><link rel="icon" href="/img/brand/imagroup.webp">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/admin.css?v=3"><script src="/js/theme.js?v=7"></script><script src="/js/admin.js?v=3" defer></script></head>`;
+  const themeBtn = `<button type="button" class="ad-icon ad-theme" data-theme-btn aria-label="Cambiar entre modo claro y oscuro">${ic('sun')}${ic('moon')}</button>`;
+  if (!req.admin) return `${head}<body class="ad-guest"><div class="ad-orbs" aria-hidden="true"><i></i><i></i><i></i></div>${themeBtn}<main class="ad-guest-main">${body}</main></body></html>`;
+  const cur = req.originalUrl.split('?')[0].replace(/\/$/, '') || '/admin';
+  const on = (href) => (href === '/admin' ? cur === href : cur === href || cur.startsWith(href + '/'));
+  const fresh = get(`SELECT COUNT(*) n FROM leads WHERE status = 'nuevo'`).n;
+  const link = ([href, label, icon], cls = '') => `<a class="${cls}" href="${href}"${on(href) ? ' aria-current="page"' : ''}>${ic(icon)}<span>${label}</span>${href === '/admin/leads' && fresh ? `<b class="ad-badge">${fresh}</b>` : ''}</a>`;
+  const logout = `<form method="post" action="/admin/logout"><input type="hidden" name="_csrf" value="${h(req.csrf)}"><button class="ad-out">${ic('out')}<span>Salir</span></button></form>`;
+  const user = h(req.admin.username);
+  return `${head}<body><div class="ad">
+<aside class="ad-side"><a class="ad-brand" href="/admin"><img src="/img/brand/imagroup.webp" alt="" width="36" height="36"><span><b>Imagroup</b><small>Panel de gestión</small></span></a>
+<nav class="ad-nav" aria-label="Secciones del panel">${NAV.map((n) => link(n)).join('')}</nav>
+<div class="ad-promo"><div class="ad-docs" aria-hidden="true"><i></i><i></i><i>${ic('down')}</i></div><b>Solicitudes en Excel</b><small>Todas las solicitudes y pedidos en un archivo CSV.</small><a class="a-btn" href="/admin/leads.csv">Descargar</a></div>
+${logout}</aside>
+<div class="ad-body"><header class="ad-top"><a class="ad-brand ad-brand-m" href="/admin"><img src="/img/brand/imagroup.webp" alt="" width="32" height="32"><b>Imagroup</b></a>
+<p class="ad-crumb">${h(title)}</p><div class="ad-tools"><a class="ad-icon" href="/" target="_blank" rel="noopener" aria-label="Ver el sitio público">${ic('ext')}</a>${themeBtn}<span class="ad-user" title="${user}">${user.slice(0, 1).toUpperCase()}</span></div></header>
+<main class="ad-main" id="main">${body}</main></div></div>
+<nav class="ad-tabs" aria-label="Secciones principales">${NAV.filter((n) => TABS.includes(n[0])).map((n) => link(n)).join('')}
+<details class="ad-more"><summary>${ic('dots')}<span>Más</span></summary><div class="ad-sheet">${NAV.filter((n) => !TABS.includes(n[0])).map((n) => link(n)).join('')}<a href="/admin/leads.csv">${ic('down')}<span>Exportar CSV</span></a>${logout}</div></details></nav>
+</body></html>`;
+};
 const csrf = (req) => `<input type="hidden" name="_csrf" value="${h(req.csrf)}">`;
 const slugify = (s) => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80);
 
 // ---- Acceso ----
 r.get('/login', (req, res) => req.admin ? res.redirect('/admin') : res.send(shell(req, 'Ingresar', loginForm())));
-const loginForm = (err = '') => `<form class="a-card a-login" method="post" action="/admin/login"><h1>Panel de administración</h1>
+const loginForm = (err = '') => `<form class="a-card a-login" method="post" action="/admin/login"><img class="a-logo" src="/img/brand/imagroup.webp" alt="" width="56" height="56"><h1>Panel de gestión</h1><p class="a-muted">Ingresa con tu usuario de Imagroup.</p>
 ${err ? `<p class="a-err" role="alert">${h(err)}</p>` : ''}<label>Usuario<input name="username" required autocomplete="username"></label>
 <label>Contraseña<input name="password" type="password" required autocomplete="current-password"></label><button class="a-btn">Ingresar</button></form>`;
 r.post('/login', express.urlencoded({ extended: false }), (req, res) => {
@@ -100,19 +143,69 @@ r.post('/logout', (req, res) => { destroySession(req, res); res.redirect('/admin
 // ---- Inicio del panel ----
 r.get('/', (req, res) => {
   const c = (sql) => get(sql).n;
-  const top = all(`SELECT path, SUM(count) AS n FROM pageviews WHERE day >= date('now','-30 days') GROUP BY path ORDER BY n DESC LIMIT 8`);
-  const days = all(`SELECT day, SUM(count) AS n FROM pageviews WHERE day >= date('now','-13 days') GROUP BY day ORDER BY day`);
-  const max = Math.max(1, ...days.map((d) => d.n));
-  const leads = all('SELECT * FROM leads ORDER BY id DESC LIMIT 6');
-  res.send(shell(req, 'Inicio', `<h1>Hola, ${h(req.admin.username)}</h1>
-  <div class="a-stats"><a href="/admin/leads?status=nuevo"><b>${c(`SELECT COUNT(*) n FROM leads WHERE status='nuevo'`)}</b>solicitudes nuevas</a>
-  <a href="/admin/leads?kind=pedido"><b>${c(`SELECT COUNT(*) n FROM leads WHERE kind='pedido'`)}</b>pedidos recibidos</a>
-  <div><b>${c(`SELECT COALESCE(SUM(count),0) n FROM pageviews WHERE day >= date('now','-30 days')`)}</b>visitas en 30 días</div>
-  <a href="/admin/products"><b>${c('SELECT COUNT(*) n FROM products WHERE visible=1')}</b>productos publicados</a></div>
-  <div class="a-cols"><section class="a-card"><h2>Últimas solicitudes</h2>${leads.length ? `<ul class="a-list">${leads.map((l) => `<li><a href="/admin/leads/${l.id}"><b>${h(l.name || l.email)}</b> · ${h(l.kind)} · ${h(l.subject || '')}</a><span class="a-pill s-${h(l.status.replace(' ', '-'))}">${h(l.status)}</span></li>`).join('')}</ul>` : '<p class="a-empty">Aún no hay solicitudes. Aparecerán aquí cuando alguien use el formulario o el carrito.</p>'}</section>
-  <section class="a-card"><h2>Visitas por día</h2><p class="a-help">Datos agregados y anónimos: no identifican personas. Solo se conoce a quien envía un formulario.</p>
-  ${days.length ? `<div class="a-bars">${days.map((d) => `<span style="--h:${Math.round((d.n / max) * 100)}%" title="${d.day}: ${d.n}"><i>${d.n}</i></span>`).join('')}</div>
-  <h3>Páginas más vistas (30 días)</h3><ol class="a-top-pages">${top.map((t) => `<li><span>${h(t.path)}</span><b>${t.n}</b></li>`).join('')}</ol>` : '<p class="a-empty">Sin visitas registradas todavía.</p>'}</section></div>`));
+  const PV = `FROM pageviews WHERE path <> '/healthz' AND`;
+  const top = all(`SELECT path, SUM(count) AS n ${PV} day >= date('now','-30 days') GROUP BY path ORDER BY n DESC LIMIT 6`);
+  const byDay = Object.fromEntries(all(`SELECT day, SUM(count) AS n ${PV} day >= date('now','-13 days') GROUP BY day`).map((d) => [d.day, d.n]));
+  const series = [...Array(14)].map((_, i) => { const d = new Date(Date.now() - (13 - i) * 864e5).toISOString().slice(0, 10); return { d, n: byDay[d] || 0 }; });
+  const v30 = c(`SELECT COALESCE(SUM(count),0) n ${PV} day >= date('now','-30 days')`);
+  const vPrev = c(`SELECT COALESCE(SUM(count),0) n ${PV} day >= date('now','-60 days') AND day < date('now','-30 days')`);
+  const fresh = c(`SELECT COUNT(*) n FROM leads WHERE status='nuevo'`), orders = c(`SELECT COUNT(*) n FROM leads WHERE kind='pedido'`), total = c('SELECT COUNT(*) n FROM leads');
+  const pub = c('SELECT COUNT(*) n FROM products WHERE visible=1'), prods = c('SELECT COUNT(*) n FROM products');
+  const leads = all('SELECT * FROM leads ORDER BY id DESC LIMIT 5');
+  const acts = all('SELECT * FROM audit ORDER BY id DESC LIMIT 5');
+
+  // Curva suave (Catmull-Rom → Bézier) de visitas por día.
+  const W = 320, H = 120, mx = Math.max(1, ...series.map((s) => s.n));
+  const P = series.map((s, i) => [+(i * (W / 13)).toFixed(1), +(H - 10 - (s.n / mx) * (H - 30)).toFixed(1)]);
+  let line = `M${P[0]}`;
+  for (let i = 0; i < 13; i++) {
+    const [a, b, c2, d] = [P[i - 1] || P[i], P[i], P[i + 1], P[i + 2] || P[i + 1]];
+    line += ` C${(b[0] + (c2[0] - a[0]) / 6).toFixed(1)},${(b[1] + (c2[1] - a[1]) / 6).toFixed(1)} ${(c2[0] - (d[0] - b[0]) / 6).toFixed(1)},${(c2[1] - (d[1] - b[1]) / 6).toFixed(1)} ${c2}`;
+  }
+  const peak = series.reduce((m, s, i) => (s.n > series[m].n ? i : m), 0);
+  const delta = vPrev ? Math.round(((v30 - vPrev) / vPrev) * 100) : null;
+  const tmax = Math.max(1, ...top.map((t) => t.n));
+  const pct = prods ? Math.round((pub / prods) * 100) : 0;
+  const today = new Intl.DateTimeFormat('es-PE', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Lima' }).format(new Date());
+  const ACT = { login: ['in', 'Ingresó al panel'], create: ['plus', 'Creó'], update: ['pen', 'Editó'], delete: ['x', 'Eliminó'], export: ['down', 'Exportó'], password_set: ['shield', 'Definió su contraseña'] };
+  const ENTN = { products: 'un producto', categories: 'una categoría', services: 'un servicio', projects: 'un proyecto', companies: 'una empresa', settings: 'los ajustes', leads: 'solicitudes' };
+  const count = (n, suf = '') => `<b data-count="${n}" data-suf="${suf}">${n}${suf}</b>`;
+
+  res.send(shell(req, 'Inicio', `<div class="dash">
+  <section class="d-main">
+    <header class="d-head rise"><p class="d-eye">Hola, ${h(req.admin.username)} · ${h(today)}</p><h1>Resumen</h1></header>
+    <div class="d-grid">
+      <a class="d-hero rise" style="--i:1" href="/admin/leads?status=nuevo"><span class="d-chip" aria-hidden="true"><i></i><i></i></span><span class="d-hero-k">Imagroup</span>
+        <span class="d-hero-n">${count(fresh)}<small>solicitudes nuevas</small></span>
+        <span class="d-hero-f"><span><small>Pedidos</small>${orders}</span><span><small>Total recibidas</small>${total}</span><span class="d-go">Ver ${ic('ext')}</span></span></a>
+      <section class="card d-line rise" style="--i:2"><header><h2>Visitas por día</h2><span class="d-tag">14 días</span></header>
+        <svg viewBox="0 0 ${W} ${H + 18}" role="img" aria-label="Visitas de los últimos 14 días, máximo ${series[peak].n} el ${series[peak].d}">
+          <defs><linearGradient id="ar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--ac)" stop-opacity=".28"/><stop offset="1" stop-color="var(--ac)" stop-opacity="0"/></linearGradient></defs>
+          ${[0.25, 0.5, 0.75].map((g) => `<line class="d-gl" x1="0" x2="${W}" y1="${(H * g).toFixed(0)}" y2="${(H * g).toFixed(0)}"/>`).join('')}
+          <path class="d-area" d="${line} L${W},${H} L0,${H} Z" fill="url(#ar)"/><path class="d-path" d="${line}" pathLength="1"/>
+          <circle class="d-peak" cx="${P[peak][0]}" cy="${P[peak][1]}" r="5"/>
+          ${series.map((s, i) => (i % 3 === 1 || i === 13 ? `<text x="${P[i][0]}" y="${H + 15}">${s.d.slice(8)}/${s.d.slice(5, 7)}</text>` : '')).join('')}
+        </svg></section>
+      <section class="card d-bars rise" style="--i:3"><header><h2>Páginas más vistas</h2><span class="d-tag">30 días</span></header>
+        ${top.length ? `<div class="d-cols">${top.map((t, i) => `<div class="d-col" style="--h:${Math.max(6, Math.round((t.n / tmax) * 100))};--i:${i}" title="${h(t.path)}: ${t.n}"><b>${t.n}</b><span></span><small>${h(t.path === '/' ? 'inicio' : t.path.slice(1).split('/')[0].slice(0, 10))}</small></div>`).join('')}</div>` : '<p class="a-empty">Sin visitas todavía.</p>'}
+        <p class="d-note">Conteo anónimo por página: no identifica personas.</p></section>
+      <section class="card d-donut rise" style="--i:4"><header><h2>Catálogo</h2></header>
+        <a class="d-ring" href="/admin/products" style="--p:${pct}"><svg viewBox="0 0 100 100" aria-hidden="true"><circle class="d-rbg" cx="50" cy="50" r="40" pathLength="100"/><circle class="d-rfg" cx="50" cy="50" r="40" pathLength="100"/></svg>
+          <span>${count(pub)}<small>de ${prods} publicados</small></span></a>
+        <p class="d-legend"><i></i>Publicados <i class="off"></i>Ocultos</p></section>
+    </div>
+  </section>
+  <aside class="d-side card rise" style="--i:2">
+    <div class="d-me"><span class="ad-user big">${h(req.admin.username.slice(0, 1).toUpperCase())}</span><div><b>${h(req.admin.username)}</b><small>Administrador</small></div></div>
+    <div class="d-kpi"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><path d="${line}" pathLength="1"/></svg>
+      ${delta == null ? '' : `<span class="d-delta${delta < 0 ? ' neg' : ''}">${delta > 0 ? '+' : ''}${delta}%</span>`}<small>Visitas en 30 días</small>${count(v30)}</div>
+    <h2>Últimas solicitudes</h2>
+    ${leads.length ? `<ul class="d-feed">${leads.map((l, i) => `<li style="--i:${i}"><a href="/admin/leads/${l.id}"><span class="d-ico k-${h(l.kind)}">${ic(l.kind === 'pedido' ? 'box' : 'inbox')}</span><span><b>${h(l.name || l.email)}</b><small>${h(l.kind)} · ${h(l.created_at.slice(5, 16))}</small></span><span class="a-pill s-${h(l.status.replace(' ', '-'))}">${h(l.status)}</span></a></li>`).join('')}</ul>`
+      : '<p class="d-empty">Aún no hay solicitudes. Llegarán aquí desde el formulario de contacto y el carrito.</p>'}
+    <h2>Actividad del equipo</h2>
+    <ul class="d-feed">${acts.map((a, i) => { const [icon, verb] = ACT[a.action] || ['pen', a.action]; return `<li style="--i:${i + 3}"><span class="d-ico a-${h(a.action)}">${ic(icon)}</span><span><b>${h(verb)} ${a.action === 'login' || a.action === 'password_set' ? '' : h(ENTN[a.entity] || a.entity || '')}</b><small>${h(a.admin)} · ${h(String(a.at).slice(5, 16))}</small></span></li>`; }).join('')}</ul>
+  </aside>
+</div>`));
 });
 
 // ---- Solicitudes y pedidos ----
