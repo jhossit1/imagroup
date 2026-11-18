@@ -67,6 +67,7 @@ app.get('/carrito', (req, res) => page(res, { title: 'Tu pedido', path: '/carrit
   body: V.cartPage(settings(), visibleProducts().map(({ slug, name, price_cents, image, availability }) => ({ slug, name, price: price_cents, image, availability }))) }));
 
 app.get('/portafolio', (req, res) => page(res, { title: 'Portafolio', path: '/portafolio', body: V.portfolioPage(settings(), all('SELECT * FROM projects WHERE visible = 1 ORDER BY sort')) }));
+app.get('/portafolio/jhossi-tenorio', (req, res) => page(res, { title: 'Ing. Jhossi Tenorio Montenegro', desc: 'Presentación profesional del Ing. Jhossi Tenorio Montenegro, ingeniero ambiental (CIP 285140).', path: '/portafolio', body: V.profilePage(settings()) }));
 app.get('/portafolio/:slug', (req, res, next) => {
   const p = get('SELECT * FROM projects WHERE slug = ? AND visible = 1', req.params.slug);
   if (!p) return next();
@@ -128,7 +129,7 @@ app.post('/pedido', (req, res) => {
 app.get('/robots.txt', (req, res) => res.type('text').send(settings().review_banner === '1' ? 'User-agent: *\nDisallow: /\n' : `User-agent: *\nDisallow: /admin\nSitemap: ${req.protocol}://${req.get('host')}/sitemap.xml\n`));
 app.get('/sitemap.xml', (req, res) => {
   const base = `${req.protocol}://${req.get('host')}`;
-  const urls = ['/', '/servicios', '/tienda', '/portafolio', '/contacto',
+  const urls = ['/', '/servicios', '/tienda', '/portafolio', '/portafolio/jhossi-tenorio', '/contacto',
     ...all('SELECT slug FROM services WHERE visible = 1').map((r) => '/servicios/' + r.slug),
     ...all('SELECT slug FROM products WHERE visible = 1').map((r) => '/tienda/' + r.slug),
     ...all('SELECT slug FROM projects WHERE visible = 1').map((r) => '/portafolio/' + r.slug)];

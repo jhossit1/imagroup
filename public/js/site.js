@@ -95,3 +95,30 @@
     $$('.pj[data-area]').forEach((p) => { p.hidden = b.dataset.f && p.dataset.area !== b.dataset.f; if (!p.hidden) p.classList.add('in'); });
   });
 })();
+
+// Presentación profesional: cifras que cuentan, línea de trayectoria que avanza y filtro de formación.
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const nums = document.querySelectorAll('[data-count]');
+  if (nums.length && 'IntersectionObserver' in window && !still) {
+    const io = new IntersectionObserver((es) => es.forEach((e) => {
+      if (!e.isIntersecting) return; io.unobserve(e.target);
+      const el = e.target, end = +el.dataset.count, suf = el.dataset.suf || '', t0 = performance.now();
+      const step = (t) => { const k = Math.min(1, (t - t0) / 1400); el.textContent = Math.round(end * (1 - Math.pow(1 - k, 3))) + suf; if (k < 1) requestAnimationFrame(step); };
+      requestAnimationFrame(step);
+    }), { threshold: .6 });
+    nums.forEach((n) => { n.textContent = '0' + (n.dataset.suf || ''); io.observe(n); });
+  }
+  const line = document.querySelector('[data-line]');
+  if (line) {
+    let raf = 0;
+    const upd = () => { raf = 0; const r = line.getBoundingClientRect(), vh = innerHeight * .6; line.style.setProperty('--p', Math.max(0, Math.min(1, (vh - r.top) / r.height)).toFixed(3)); };
+    addEventListener('scroll', () => { if (!raf) raf = requestAnimationFrame(upd); }, { passive: true }); upd();
+  }
+  const tabs = document.querySelector('[data-study]');
+  if (tabs) tabs.addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    tabs.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', x === b));
+    let n = 0; document.querySelectorAll('.pf-study li').forEach((li) => { li.hidden = li.dataset.k !== b.dataset.k; if (!li.hidden) li.style.setProperty('--n', n++); });
+  });
+})();
