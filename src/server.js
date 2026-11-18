@@ -66,7 +66,7 @@ app.get('/tienda/:slug', (req, res, next) => {
 app.get('/carrito', (req, res) => page(res, { title: 'Tu pedido', path: '/carrito', theme: 'shop',
   body: V.cartPage(settings(), visibleProducts().map(({ slug, name, price_cents, image, availability }) => ({ slug, name, price: price_cents, image, availability }))) }));
 
-app.get('/portafolio', (req, res) => page(res, { title: 'Ing. Jhossi Tenorio Montenegro · Portafolio', desc: 'Portafolio del Ing. Jhossi Tenorio Montenegro, ingeniero ambiental (CIP 285140): trayectoria, especialidades y formación.', path: '/portafolio', theme: 'pf-page', body: V.profilePage(settings()) }));
+app.get('/portafolio', (req, res) => page(res, { title: 'Ing. Jhossi Tenorio Montenegro · Portafolio', desc: 'Portafolio del Ing. Jhossi Tenorio Montenegro, ingeniero ambiental (CIP 285140): trayectoria, especialidades y formación.', path: '/portafolio', body: V.profilePage(settings()) }));
 app.get('/portafolio/jhossi-tenorio', (req, res) => res.redirect(301, '/portafolio'));
 app.get('/portafolio/:slug', (req, res, next) => {
   const p = get('SELECT * FROM projects WHERE slug = ? AND visible = 1', req.params.slug);

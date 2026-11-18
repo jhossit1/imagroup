@@ -109,12 +109,6 @@
     }), { threshold: .6 });
     nums.forEach((n) => { n.textContent = '0' + (n.dataset.suf || ''); io.observe(n); });
   }
-  const line = document.querySelector('[data-line]');
-  if (line) {
-    let raf = 0;
-    const upd = () => { raf = 0; const r = line.getBoundingClientRect(), vh = innerHeight * .6; line.style.setProperty('--p', Math.max(0, Math.min(1, (vh - r.top) / r.height)).toFixed(3)); };
-    addEventListener('scroll', () => { if (!raf) raf = requestAnimationFrame(upd); }, { passive: true }); upd();
-  }
   const tabs = document.querySelector('[data-study]');
   if (tabs) tabs.addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
@@ -193,4 +187,54 @@
     if (sraf) return;
     sraf = requestAnimationFrame(() => { sraf = 0; const s = Math.min(scrollY, innerHeight); ph.style.setProperty('--sy', s.toFixed(0)); });
   }, { passive: true });
+})();
+
+// Portafolio v3: carrusel 3D de especialidades, riel arrastrable de trayectoria y título que se escribe solo.
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const car = document.querySelector('[data-carousel]');
+  if (car) {
+    const cards = [...car.querySelectorAll('.pf-c')], dots = [...document.querySelectorAll('[data-dot]')], N = cards.length;
+    let cur = 0, timer = 0;
+    const show = (i) => {
+      cur = (i + N) % N;
+      cards.forEach((c, k) => {
+        let o = k - cur; if (o > N / 2) o -= N; if (o < -N / 2) o += N;
+        c.style.setProperty('--o', o); c.style.setProperty('--a', Math.abs(o));
+        c.classList.toggle('on', o === 0); c.setAttribute('aria-hidden', o !== 0); c.inert = o !== 0 && Math.abs(o) > 1;
+      });
+      dots.forEach((d, k) => d.setAttribute('aria-selected', k === cur));
+    };
+    const auto = () => { clearInterval(timer); if (!still) timer = setInterval(() => show(cur + 1), 5000); };
+    document.querySelectorAll('button[data-car]').forEach((b) => b.addEventListener('click', () => { show(cur + Number(b.dataset.car)); auto(); }));
+    dots.forEach((d) => d.addEventListener('click', () => { show(+d.dataset.dot); auto(); }));
+    cards.forEach((c, k) => c.addEventListener('click', () => { if (k !== cur) { show(k); auto(); } }));
+    car.addEventListener('keydown', (e) => { if (e.key === 'ArrowRight') { show(cur + 1); auto(); } if (e.key === 'ArrowLeft') { show(cur - 1); auto(); } });
+    let x0 = null;
+    car.addEventListener('pointerdown', (e) => { x0 = e.clientX; });
+    car.addEventListener('pointerup', (e) => { if (x0 !== null && Math.abs(e.clientX - x0) > 40) { show(cur + (e.clientX < x0 ? 1 : -1)); auto(); } x0 = null; });
+    car.addEventListener('mouseenter', () => clearInterval(timer)); car.addEventListener('mouseleave', auto);
+    show(0); auto();
+  }
+
+  const rail = document.querySelector('[data-railbox]');
+  if (rail) {
+    const bar = document.querySelector('[data-rail-bar]');
+    const upd = () => { const m = rail.scrollWidth - rail.clientWidth; bar.style.setProperty('--p', m > 0 ? Math.max(.06, rail.scrollLeft / m).toFixed(3) : 1); };
+    rail.addEventListener('scroll', upd, { passive: true }); upd();
+    const step = () => (rail.querySelector('.pf-job')?.offsetWidth || 320) + 18;
+    document.querySelectorAll('button[data-rail]').forEach((b) => b.addEventListener('click', () => rail.scrollBy({ left: step() * Number(b.dataset.rail), behavior: still ? 'auto' : 'smooth' })));
+    let sx = 0, sl = 0, down = false, moved = false;
+    rail.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'mouse') return; down = true; moved = false; sx = e.clientX; sl = rail.scrollLeft; });
+    addEventListener('pointermove', (e) => { if (!down) return; const dx = e.clientX - sx; if (Math.abs(dx) > 5) { moved = true; rail.classList.add('drag'); } rail.scrollLeft = sl - dx; });
+    addEventListener('pointerup', () => { if (!down) return; down = false; rail.classList.remove('drag'); if (moved) rail.scrollBy({ left: 0 }); });
+  }
+
+  const typed = document.querySelector('[data-type]');
+  if (typed && !still && 'IntersectionObserver' in window) {
+    const full = typed.dataset.type; typed.textContent = '';
+    const io = new IntersectionObserver((es) => { if (!es[0].isIntersecting) return; io.disconnect(); let i = 0; const t = setInterval(() => { typed.textContent = full.slice(0, ++i); if (i >= full.length) clearInterval(t); }, 38); }, { threshold: .6 });
+    io.observe(typed);
+  }
 })();

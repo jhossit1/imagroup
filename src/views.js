@@ -21,7 +21,7 @@ export function layout(s, { title, desc, path = '/', body, theme = '' }) {
 ${s.review_banner === '1' ? '<meta name="robots" content="noindex">' : ''}
 <link rel="icon" href="/img/brand/imagroup.webp"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/site.css?v=10"><script src="/js/theme.js?v=7"></script></head>
+<link rel="stylesheet" href="/css/site.css?v=12"><script src="/js/theme.js?v=7"></script></head>
 <body class="${theme}">
 <a class="skip" href="#main">Saltar al contenido</a>
 ${s.review_banner === '1' ? '<div class="review">Versión de revisión. Los pagos en línea aún no están habilitados: los pedidos se confirman por WhatsApp o teléfono.</div>' : ''}
@@ -50,7 +50,7 @@ ${s.review_banner === '1' ? '<div class="review">Versión de revisión. Los pago
   <p class="fine">© ${new Date().getFullYear()} Imagroup S.A.C. ${s.facebook ? `· <a href="${h(s.facebook)}" rel="noopener">Facebook</a>` : ''}</p>
 </div></footer>
 <a class="wa-float" href="${wa(s.whatsapp, 'Hola, vengo de la web de Imagroup.')}" target="_blank" rel="noopener" aria-label="Escribir por WhatsApp">${ICON.wa}</a>
-<script src="/js/site.js?v=10" defer></script></body></html>`;
+<script src="/js/site.js?v=12" defer></script></body></html>`;
 }
 
 const frame = (src, alt, cls = '', eager = false) =>
@@ -239,16 +239,18 @@ export function message(title, text, back = '/') {
   return `<section class="wrap detail done"><h1>${h(title)}</h1><p class="lead">${h(text)}</p><a class="btn" href="${h(back)}">Volver</a></section>`;
 }
 
-// Presentación profesional (CV) con la paleta del sitio: tinta, papel, azul Imagroup y oro.
+// Portafolio personal del ingeniero a cargo: compacto, en claro y oscuro.
 export function profilePage(s) {
   const P = PROFILE;
   const years = new Date().getFullYear() - P.since;
   const orgs = new Set(P.jobs.map((j) => j.org)).size;
-  const kinds = { grado: 'Grados y estudios', diplomado: 'Diplomados', curso: 'Cursos y programas' };
-  const count = (k) => P.study.filter((x) => x.k === k).length;
-  const marq = (items) => `<div class="pf-marquee" aria-hidden="true"><div>${[0, 1].map(() => `<span>${items.map((t) => `<b>${h(t)}</b><i>✦</i>`).join('')}</span>`).join('')}</div></div>`;
-  const img = (n, alt = '') => `<img src="/img/f/${n}-sm.webp" alt="${h(alt)}" loading="lazy" decoding="async">`;
   const waP = (t) => wa(s.whatsapp, t);
+  const pad = (n) => String(n).padStart(2, '0');
+  const img = (n, alt = '') => `<img src="/img/f/${n}-sm.webp" alt="${h(alt)}" loading="lazy" decoding="async">`;
+  const marq = (items) => `<div class="pf-marquee" aria-hidden="true"><div>${[0, 1].map(() => `<span>${items.map((t) => `<b>${h(t)}</b><i>✦</i>`).join('')}</span>`).join('')}</div></div>`;
+  const tabs = [['grado', 'Grados'], ['diplomado', 'Diplomados'], ['curso', 'Cursos'], ['soft', 'Software e idiomas']];
+  const n = (k) => (k === 'soft' ? P.tools.length + P.langs.length : P.study.filter((x) => x.k === k).length);
+  const arrows = (name) => `<div class="pf-arrows"><button type="button" data-${name}="-1" aria-label="Anterior">←</button><button type="button" data-${name}="1" aria-label="Siguiente">→</button></div>`;
   return `<div class="pf">
   <section class="ph" data-ph>
     <div class="ph-glow" aria-hidden="true"></div>
@@ -262,55 +264,57 @@ export function profilePage(s) {
         </h1>
         <p class="ph-role rise" style="--d:3">${h(P.role)} · <b>CIP ${P.cip}</b></p>
         <p class="pf-intro rise" style="--d:4">${h(P.intro)}</p>
-        <div class="pf-cta rise" style="--d:5"><a class="btn gold" href="${waP('Hola Ing. ' + P.first + ', vengo de su presentación en la web de Imagroup.')}" target="_blank" rel="noopener">${ICON.wa}Escribir por WhatsApp</a><a class="btn pf-ghost" href="#trayectoria">Ver trayectoria <span aria-hidden="true">↓</span></a></div>
+        <div class="pf-cta rise" style="--d:5"><a class="btn gold" href="${waP('Hola Ing. ' + P.first + ', vengo de su portafolio en la web de Imagroup.')}" target="_blank" rel="noopener">${ICON.wa}Escribir por WhatsApp</a><a class="btn pf-ghost" href="#trayectoria">Ver trayectoria <span aria-hidden="true">→</span></a></div>
+        <ul class="ph-facts rise" style="--d:6">
+          ${[[years, '+', 'años de experiencia'], [P.jobs.length, '', 'cargos'], [orgs, '', 'instituciones'], [P.study.length, '', 'formaciones']]
+            .map(([v, suf, l]) => `<li><b data-count="${v}" data-suf="${suf}">${v}${suf}</b><span>${l}</span></li>`).join('')}
+        </ul>
       </div>
-      <figure class="ph-photo" data-depth="18"><img src="/img/brand/jhossi.webp" srcset="/img/brand/jhossi-sm.webp 560w, /img/brand/jhossi.webp 900w" sizes="(max-width: 760px) 92vw, 46vw" alt="Ing. ${h(P.name)}" width="900" height="1200" fetchpriority="high"></figure>
-      <ul class="ph-chips" aria-hidden="true" data-depth="34">${P.tags.slice(0, 4).map((t, i) => `<li style="--i:${i}">${h(t)}</li>`).join('')}</ul>
-      <p class="ph-vert" aria-hidden="true">Ingeniero ambiental — ${years}+ años</p>
-      <ul class="ph-facts rise" style="--d:6">
-        <li><i aria-hidden="true">+</i><b>${years}+ años</b><span>en gestión ambiental y municipal</span></li>
-        <li><i aria-hidden="true">+</i><b>${orgs} instituciones</b><span>municipalidades, MINAM y empresas</span></li>
-      </ul>
+      <div class="ph-media">
+        <div class="ph-halo" aria-hidden="true"></div>
+        <figure class="ph-photo"><img src="/img/brand/jhossi-cut.webp?v=2" srcset="/img/brand/jhossi-cut-sm.webp?v=2 560w, /img/brand/jhossi-cut.webp?v=2 900w" sizes="(max-width: 760px) 86vw, 44vw" alt="Ing. ${h(P.name)}" width="900" height="1200" fetchpriority="high"></figure>
+        <ul class="ph-chips" aria-hidden="true">${P.tags.slice(0, 4).map((t, i) => `<li style="--i:${i}">${h(t)}</li>`).join('')}</ul>
+      </div>
+      <p class="ph-vert" aria-hidden="true">Ingeniero ambiental — CIP ${P.cip}</p>
     </div>
-    <a class="ph-scroll" href="#cifras" aria-label="Bajar"><span></span></a>
   </section>${marq(P.tags.concat(P.tools.map((t) => t[0]).slice(0, 4)))}
 
-  <section class="wrap pf-stats" id="cifras" aria-label="En cifras">
-    ${[[years, '+', 'años de experiencia'], [P.jobs.length, '', 'cargos desempeñados'], [orgs, '', 'instituciones y empresas'], [P.study.length, '', 'estudios y capacitaciones']]
-      .map(([n, suf, l]) => `<div class="reveal"><b data-count="${n}" data-suf="${suf}">${n}${suf}</b><span>${l}</span></div>`).join('')}
-  </section>
-
-  <section class="wrap pf-sec"><header class="pf-head reveal"><p class="pf-eyebrow">Especialidades</p><h2>Lo que hace en <span class="pf-mark">campo</span></h2></header>
-    <div class="pf-stack">${P.areas.map((a, i) => `<article class="pf-card" style="--i:${i}"><div class="pf-card-tx"><span class="pf-num">${String(i + 1).padStart(2, '0')}</span><h3>${h(a.t)}</h3><p>${h(a.d)}</p></div><figure>${img(a.img.replace('/img/f/', ''), a.t)}</figure></article>`).join('')}</div>
-  </section>
-
-  <section class="pf-dark" id="trayectoria"><div class="wrap pf-sec">
-    <header class="pf-head reveal"><p class="pf-eyebrow">Experiencia laboral</p><h2>Trayectoria en el <span class="pf-mark">sector público</span> y privado</h2></header>
-    <ol class="pf-line" data-line>${P.jobs.map((j) => `<li class="reveal${j.now ? ' now' : ''}"><span class="pf-year">${h(j.y)}</span><div>
-      <p class="pf-per">${h(j.p)}${j.now ? ' <em>Actual</em>' : ''}</p><h3>${h(j.role)}</h3><p class="pf-org">${h(j.org)}</p>
-      ${j.note ? `<p class="pf-note">${h(j.note)}</p>` : ''}
-      ${j.extra ? `<details><summary>Encargaturas (${j.extra.length})</summary><ul>${j.extra.map((e) => `<li>${h(e)}</li>`).join('')}</ul></details>` : ''}</div></li>`).join('')}</ol>
+  <section class="pf-sec pf-spec" aria-labelledby="esp-t"><div class="wrap">
+    <header class="pf-head reveal"><div><p class="pf-eyebrow">Especialidades</p><h2 id="esp-t">Lo que hace en <span class="pf-mark">campo</span></h2></div>${arrows('car')}</header>
+    <div class="pf-car" data-carousel tabindex="0" aria-roledescription="carrusel" aria-label="Especialidades">
+      ${P.areas.map((a, i) => `<article class="pf-c" data-i="${i}" aria-label="${h(a.t)}"><figure>${img(a.img.replace('/img/f/', ''), a.t)}</figure>
+        <div class="pf-c-tx"><span class="pf-num">${pad(i + 1)}</span><h3>${h(a.t)}</h3><p>${h(a.d)}</p></div></article>`).join('')}
+    </div>
+    <div class="pf-dots" role="tablist" aria-label="Elegir especialidad">${P.areas.map((a, i) => `<button type="button" role="tab" data-dot="${i}" aria-label="${h(a.t)}"></button>`).join('')}</div>
   </div></section>
 
-  <section class="wrap pf-sec"><header class="pf-head reveal"><p class="pf-eyebrow">Formación</p><h2>Estudios y <span class="pf-mark">capacitación</span></h2></header>
-    <div class="chips pf-tabs" role="group" aria-label="Filtrar formación" data-study>${Object.entries(kinds).map(([k, l], i) => `<button type="button" aria-pressed="${i === 0}" data-k="${k}">${l} <small>${count(k)}</small></button>`).join('')}</div>
-    <ul class="pf-study">${P.study.map((x) => `<li data-k="${x.k}"${x.k === 'grado' ? '' : ' hidden'}><span class="pf-year">${h(x.y)}</span><div><b>${h(x.t)}</b><span>${h(x.o)}</span></div></li>`).join('')}</ul>
+  <section class="pf-sec pf-alt" id="trayectoria" aria-labelledby="tr-t"><div class="wrap">
+    <header class="pf-head reveal"><div><p class="pf-eyebrow">Experiencia laboral</p><h2 id="tr-t">Trayectoria de <span class="pf-mark">${P.since} a hoy</span></h2></div>${arrows('rail')}</header>
+  </div>
+    <div class="pf-rail" data-railbox tabindex="0" aria-label="Cargos, del más reciente al más antiguo">
+      ${P.jobs.map((j, i) => `<article class="pf-job${j.now ? ' now' : ''}" style="--i:${i}"><span class="pf-dot" aria-hidden="true"></span><p class="pf-per"><span class="pf-year">${h(j.y)}</span>${h(j.p)}${j.now ? ' <em>Actual</em>' : ''}</p>
+        <h3>${h(j.role)}</h3><p class="pf-org">${h(j.org)}</p>${j.note ? `<p class="pf-note">${h(j.note)}</p>` : ''}
+        ${j.extra ? `<details><summary>${j.extra.length} encargaturas</summary><ul>${j.extra.map((e) => `<li>${h(e)}</li>`).join('')}</ul></details>` : ''}</article>`).join('')}
+    </div>
+    <div class="wrap"><div class="pf-progress" aria-hidden="true"><span data-rail-bar></span></div></div>
   </section>
 
-  <section class="pf-soft"><div class="wrap pf-sec pf-tools-wrap">
-    <header class="pf-head reveal"><p class="pf-eyebrow">Herramientas</p><h2>Software que <span class="pf-mark">domina</span></h2>
-      <ul class="pf-langs">${P.langs.map(([l, n]) => `<li><b>${l}</b> ${n}</li>`).join('')}</ul></header>
-    <ul class="pf-tools">${P.tools.map(([t, d], i) => `<li class="reveal"><span>${String(i + 1).padStart(2, '0')}</span><b>${h(t)}</b><small>${h(d)}</small></li>`).join('')}</ul>
+  <section class="pf-sec" aria-labelledby="fo-t"><div class="wrap">
+    <header class="pf-head reveal"><div><p class="pf-eyebrow">Formación y herramientas</p><h2 id="fo-t">Estudios, cursos y <span class="pf-mark">software</span></h2></div></header>
+    <div class="chips pf-tabs" role="group" aria-label="Filtrar formación" data-study>${tabs.map(([k, l], i) => `<button type="button" aria-pressed="${i === 0}" data-k="${k}">${l} <small>${n(k)}</small></button>`).join('')}</div>
+    <ul class="pf-study">${P.study.map((x) => `<li data-k="${x.k}"${x.k === 'grado' ? '' : ' hidden'}><span class="pf-year">${h(x.y)}</span><div><b>${h(x.t)}</b><span>${h(x.o)}</span></div></li>`).join('')}
+      ${P.tools.map(([t, d]) => `<li data-k="soft" hidden><span class="pf-year">SW</span><div><b>${h(t)}</b><span>${h(d)}</span></div></li>`).join('')}
+      ${P.langs.map(([l, v]) => `<li data-k="soft" hidden><span class="pf-year">ES/EN</span><div><b>${h(l)}</b><span>${h(v)}</span></div></li>`).join('')}</ul>
   </div></section>
 
-  <section class="pf-gal" aria-label="Fotos de trabajo en campo"><header class="wrap pf-head reveal"><p class="pf-eyebrow">En campo</p><h2>Fotos reales de <span class="pf-mark">obra y talleres</span></h2></header>
-    ${[0, 1].map((r) => `<div class="pf-gal-row${r ? ' rev' : ''}"><div>${[0, 1].map((dup) => P.gallery.filter((_, i) => i % 2 === r).map((g) => `<figure${dup ? ' aria-hidden="true"' : ''}>${img(g, dup ? '' : 'Trabajo en campo de Imagroup')}</figure>`).join('')).join('')}</div></div>`).join('')}
-  </section>
+  <section class="pf-gal" aria-label="Fotos de trabajo en campo"><div class="pf-gal-row"><div>${[0, 1].map((dup) => P.gallery.map((g) => `<figure${dup ? ' aria-hidden="true"' : ''}>${img(g, dup ? '' : 'Trabajo en campo')}</figure>`).join('')).join('')}</div></div></section>
 
-  <section class="pf-dark pf-end"><div class="wrap pf-end-in reveal">
-    <p class="pf-eyebrow">Contacto</p><h2>¿Tiene un proyecto ambiental o municipal? <span class="pf-mark">Conversemos.</span></h2>
+  <section class="pf-sec pf-end"><div class="wrap"><div class="glow-box reveal">
+    <p class="pf-eyebrow">Contacto</p>
+    <h2><span data-type="¿Tiene un proyecto ambiental o municipal?">¿Tiene un proyecto ambiental o municipal?</span><span class="caret" aria-hidden="true"></span></h2>
+    <p class="pf-intro">Conversemos sobre alcance, plazos y costos.</p>
     <div class="pf-cta"><a class="btn gold" href="${waP('Hola Ing. ' + P.first + ', quisiera conversar sobre un proyecto.')}" target="_blank" rel="noopener">${ICON.wa}WhatsApp ${h(s.phone_1)}</a><a class="btn pf-ghost" href="/contacto?asunto=${encodeURIComponent('Consulta para el Ing. ' + P.first + ' Tenorio')}">Enviar un mensaje</a></div>
-    <p class="pf-fine">Toda la información de esta presentación puede acreditarse con documentos a solicitud.</p>
-  </div></section>
+    <p class="pf-fine">La información de este portafolio puede acreditarse con documentos a solicitud.</p>
+  </div></div></section>
   </div>`;
 }
