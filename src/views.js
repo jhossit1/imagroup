@@ -1,0 +1,235 @@
+// Plantillas públicas (HTML renderizado en servidor).
+export const h = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+export const money = (c) => (c == null ? 'Consultar' : 'S/ ' + (c / 100).toFixed(2));
+const lines = (t) => String(t || '').split('\n').map((s) => s.trim()).filter(Boolean);
+export const wa = (num, text) => `https://wa.me/${h(num)}?text=${encodeURIComponent(text)}`;
+
+const ICON = {
+  wa: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6a2.7 2.7 0 0 0 1.8-1.2 2.2 2.2 0 0 0 .1-1.3c0-.1-.2-.2-.5-.3Z"/></svg>',
+  cart: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M3 4h2.2l2.1 10.3a1.5 1.5 0 0 0 1.5 1.2h8.4a1.5 1.5 0 0 0 1.4-1.1L20.5 8H6.1"/><circle cx="9.5" cy="19.5" r="1.4" fill="currentColor"/><circle cx="17" cy="19.5" r="1.4" fill="currentColor"/></svg>',
+  phone: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M6.6 3.5h2.6l1.4 4.2-2 1.4a12 12 0 0 0 6.3 6.3l1.4-2 4.2 1.4v2.6A2 2 0 0 1 18.4 19 15.6 15.6 0 0 1 4.6 5.6a2 2 0 0 1 2-2.1Z"/></svg>',
+  mail: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m3.5 6.5 8.5 6.5 8.5-6.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>',
+};
+
+export function layout(s, { title, desc, path = '/', body, theme = '' }) {
+  const full = title ? `${title} | ${s.site_name}` : `${s.site_name}: ingeniería ambiental y seguridad industrial`;
+  const nav = [['/servicios', 'Servicios'], ['/tienda', 'Tienda'], ['/portafolio', 'Portafolio'], ['/contacto', 'Contacto']];
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${h(full)}</title><meta name="description" content="${h(desc || 'Imagroup S.A.C.: consultoría y gestión ambiental, obras de ingeniería y venta de equipos de protección personal Gregorian.')}">
+<meta property="og:title" content="${h(full)}"><meta property="og:type" content="website"><meta property="og:image" content="/img/f/vial-2.webp">
+${s.review_banner === '1' ? '<meta name="robots" content="noindex">' : ''}
+<link rel="icon" href="/img/brand/imagroup.webp"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/site.css?v=4"></head>
+<body class="${theme}">
+<a class="skip" href="#main">Saltar al contenido</a>
+${s.review_banner === '1' ? '<div class="review">Versión de revisión. Los pagos en línea aún no están habilitados: los pedidos se confirman por WhatsApp o teléfono.</div>' : ''}
+<header class="top"><div class="wrap top-in">
+  <a class="brand" href="/" aria-label="Imagroup, inicio"><img src="/img/brand/imagroup.webp" alt="" width="34" height="44"><span>Imagroup<small>S.A.C.</small></span></a>
+
+  <nav id="nav" class="nav">${nav.map(([u, l]) => `<a href="${u}"${path.startsWith(u) ? ' aria-current="page"' : ''}>${l}</a>`).join('')}
+</nav>
+  <div class="top-act"><a class="cart-link" href="/carrito" aria-label="Ver pedido">${ICON.cart}<b data-cart-count hidden>0</b></a>
+  <button class="menu-btn" aria-expanded="false" aria-controls="nav"><span></span><span></span><span class="sr">Menú</span></button></div>
+</div></header>
+<main id="main">${body}</main>
+<footer class="foot"><div class="wrap foot-in">
+  <div><img src="/img/brand/imagroup.webp" alt="Imagroup" width="40" height="52"><img src="/img/brand/gregorian-sq.webp" alt="Gregorian" width="96" height="64"></div>
+  <div class="foot-cols">
+    <p><b>Imagroup S.A.C.</b><br>Consultoría, gestión ambiental y obras.<br><a href="/servicios">Servicios</a> · <a href="/portafolio">Portafolio</a></p>
+    <p><b>Gregorian</b><br>Seguridad en ingeniería.<br><a href="/tienda">Tienda de EPP</a></p>
+    <p><b>Contacto</b><br><a href="tel:+51${h((s.phone_1 || '').replace(/\D/g, ''))}">${h(s.phone_1)}</a><br><a href="mailto:${h(s.email)}">${h(s.email)}</a><br>${h(s.city)}</p>
+  </div>
+  <p class="fine">© ${new Date().getFullYear()} Imagroup S.A.C. ${s.facebook ? `· <a href="${h(s.facebook)}" rel="noopener">Facebook</a>` : ''}</p>
+</div></footer>
+<a class="wa-float" href="${wa(s.whatsapp, 'Hola, vengo de la web de Imagroup.')}" target="_blank" rel="noopener" aria-label="Escribir por WhatsApp">${ICON.wa}</a>
+<script src="/js/site.js?v=4" defer></script></body></html>`;
+}
+
+const frame = (src, alt, cls = '', eager = false) =>
+  src ? `<figure class="frame ${cls}"><img src="${h(src)}" alt="${h(alt)}" ${eager ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async"></figure>` : '';
+const sm = (src) => (src && src.startsWith('/img/f/') ? src.replace('.webp', '-sm.webp') : src);
+
+function productCard(p) {
+  return `<article class="prod reveal"><a href="/tienda/${h(p.slug)}" class="prod-img"><img src="${h(p.image)}" alt="${h(p.name)}" loading="lazy" decoding="async"></a>
+  <div class="prod-body"><h3><a href="/tienda/${h(p.slug)}">${h(p.name)}</a></h3>
+  <p class="price">${money(p.price_cents)}${p.availability !== 'disponible' ? ` <span class="avail">${h(p.availability)}</span>` : ''}</p>
+  ${p.availability === 'agotado' ? '' : `<button class="btn sm ghost" data-add='${h(JSON.stringify({ slug: p.slug, name: p.name, price: p.price_cents, image: p.image }))}'>Agregar</button>`}</div></article>`;
+}
+
+export function home(s, { companies, services, products, projects }) {
+  const [im, gr] = companies;
+  return `
+<section class="hero wrap">
+  <div class="hero-copy">
+    <h1 class="rise">Ingeniería ambiental en campo y equipos de protección para tu obra.</h1>
+    <p class="lead rise">Dos líneas de trabajo con un mismo equipo: <b>Imagroup</b> para consultoría, gestión ambiental y obras, y <b>Gregorian</b> para seguridad industrial.</p>
+    <div class="routes rise">
+      <a class="route" href="/servicios"><span>01</span>Servicios de ingeniería</a>
+      <a class="route" href="/tienda"><span>02</span>Comprar equipos de protección</a>
+      <a class="route" href="/portafolio"><span>03</span>Ver trabajos realizados</a>
+    </div>
+  </div>
+  <div class="hero-media">${frame('/img/f/vial-2.webp', 'Cuadrilla en mantenimiento de un camino vecinal', 'tall wipe', true)}
+    <p class="caption">Mantenimiento vial · caminos vecinales</p></div>
+</section>
+
+<section class="duo wrap">
+  <article class="co co-im reveal"><img class="co-logo" src="${h(im.logo)}" alt="${h(im.name)}" width="70" height="90">
+    <h2>${h(im.name)}</h2><p class="co-tag">${h(im.tagline)}</p><p>${h(im.description)}</p>
+    <ul class="ticks">${lines(im.scope).map((l) => `<li>${h(l)}</li>`).join('')}</ul>
+    <a class="btn" href="/servicios">Ver servicios de Imagroup</a></article>
+  <article class="co co-gr reveal"><img class="co-logo" src="${h(gr.logo_dark)}" alt="${h(gr.name)}" width="150" height="100">
+    <p class="co-tag">${h(gr.tagline)}</p><p>${h(gr.description)}</p>
+    <ul class="ticks">${lines(gr.scope).map((l) => `<li>${h(l)}</li>`).join('')}</ul>
+    <a class="btn gold" href="/tienda">Ir a la tienda Gregorian</a></article>
+</section>
+
+<section class="wrap block">
+  <header class="sec-head reveal"><h2>Qué hacemos en campo</h2><a href="/servicios" class="link">Todos los servicios</a></header>
+  <ol class="svc-list">${services.slice(0, 6).map((v, i) => `<li class="reveal"><a href="/servicios/${h(v.slug)}">
+    <span class="num">${String(i + 1).padStart(2, '0')}</span><span class="svc-t">${h(v.title)}</span><span class="svc-s">${h(v.summary)}</span>
+    ${v.image ? `<img class="svc-peek" src="${h(sm(v.image))}" alt="" loading="lazy">` : ''}</a></li>`).join('')}</ol>
+</section>
+
+<section class="shop-band">
+  <div class="wrap"><header class="sec-head reveal"><h2>Equipos de protección personal</h2><a href="/tienda" class="link">Ver catálogo completo</a></header>
+  <div class="rail">${products.slice(0, 8).map(productCard).join('')}</div></div>
+</section>
+
+<section class="wrap block">
+  <header class="sec-head reveal"><h2>Trabajos realizados</h2><a href="/portafolio" class="link">Portafolio completo</a></header>
+  <div class="mosaic">${projects.slice(0, 3).map((p, i) => `<a class="pj reveal ${i === 0 ? 'big' : ''}" href="/portafolio/${h(p.slug)}">
+    ${frame(i === 0 ? p.image : sm(p.image), p.title)}<span class="pj-meta">${h(p.area)}${p.period ? ' · ' + h(p.period) : ''}</span><h3>${h(p.title)}</h3></a>`).join('')}</div>
+</section>
+${contactBand(s)}`;
+}
+
+export function contactBand(s, prefill = {}) {
+  return `<section class="contact-band" id="contacto"><div class="wrap contact-in">
+  <div class="reveal"><h2>Cuéntanos qué necesitas</h2><p>Respondemos cotizaciones de servicios y pedidos de equipos. Si prefieres, escríbenos directo.</p>
+    <ul class="direct">
+      <li><a href="${wa(s.whatsapp, prefill.wa || 'Hola, quiero hacer una consulta.')}" target="_blank" rel="noopener">${ICON.wa}WhatsApp ${h(s.phone_1)}</a></li>
+      <li><a href="tel:+51${h((s.phone_2 || '').replace(/\D/g, ''))}">${ICON.phone}${h(s.phone_2)}</a></li>
+      <li><a href="mailto:${h(s.email)}">${ICON.mail}${h(s.email)}</a></li></ul></div>
+  ${leadForm(prefill)}</div></section>`;
+}
+
+export function leadForm(prefill = {}) {
+  return `<form class="form reveal" method="post" action="/contacto" novalidate data-form>
+  <input type="hidden" name="kind" value="${h(prefill.kind || 'contacto')}"><input type="hidden" name="_t" value="${Date.now()}">
+  <div class="hp" aria-hidden="true"><label>No llenar <input name="website" tabindex="-1" autocomplete="off"></label></div>
+  <div class="row2"><label>Nombre<input name="name" required maxlength="120" autocomplete="name"></label>
+  <label>Teléfono o WhatsApp<input name="phone" required maxlength="30" inputmode="tel" autocomplete="tel"></label></div>
+  <div class="row2"><label>Correo <i>(opcional)</i><input name="email" type="email" maxlength="120" autocomplete="email"></label>
+  <label>Entidad o empresa <i>(opcional)</i><input name="organization" maxlength="120" autocomplete="organization"></label></div>
+  <label>Tema<input name="subject" maxlength="140" value="${h(prefill.subject || '')}"></label>
+  <label>Tu requerimiento<textarea name="message" required maxlength="3000" rows="4" placeholder="Ubicación, plazo, alcance o cantidades"></textarea></label>
+  <p class="form-msg" role="status" aria-live="polite"></p>
+  <button class="btn" type="submit">Enviar solicitud</button></form>`;
+}
+
+export function servicesPage(s, co, services) {
+  return `<section class="page-head wrap"><img src="${h(co.logo)}" alt="" width="60" height="78" class="ph-logo">
+  <div><p class="kicker">${h(co.name)} · ${h(co.tagline)}</p><h1>Servicios de consultoría, gestión ambiental y obras</h1><p class="lead">${h(co.description)}</p></div></section>
+  <section class="wrap block"><div class="svc-grid">${services.map((v) => `<a class="svc-card reveal" href="/servicios/${h(v.slug)}">
+    ${v.image ? frame(sm(v.image), v.title) : '<div class="frame plain"><span>Planos · expedientes</span></div>'}
+    <h2>${h(v.title)}</h2><p>${h(v.summary)}</p><span class="link">Ver detalle y cotizar</span></a>`).join('')}</div></section>
+  ${contactBand(s, { kind: 'cotizacion', subject: 'Cotización de servicio' })}`;
+}
+
+export function servicePage(s, v, others) {
+  return `<article class="wrap detail">
+  <nav class="crumbs"><a href="/servicios">Servicios</a> / ${h(v.title)}</nav>
+  <div class="detail-grid"><div><h1>${h(v.title)}</h1><p class="lead">${h(v.summary)}</p><p>${h(v.body)}</p>
+    <p class="note">El alcance y el precio se definen según cada proyecto. Envíanos tu requerimiento y te respondemos con una propuesta.</p>
+    <a class="btn wa" href="${wa(s.whatsapp, `Hola, quiero cotizar: ${v.title}.`)}" target="_blank" rel="noopener">${ICON.wa}Cotizar por WhatsApp</a></div>
+  ${frame(v.image, v.title, 'tall')}</div></article>
+  ${contactBand(s, { kind: 'cotizacion', subject: `Cotización: ${v.title}`, wa: `Hola, quiero cotizar: ${v.title}.` })}
+  <section class="wrap block"><h2 class="h3">Otros servicios</h2><ul class="chips">${others.map((o) => `<li><a href="/servicios/${h(o.slug)}">${h(o.title)}</a></li>`).join('')}</ul></section>`;
+}
+
+export function shopPage(s, { co, categories, products, q, c }) {
+  return `<section class="shop-head"><div class="wrap shop-head-in">
+  <div><img src="${h(co.logo_dark)}" alt="Gregorian" width="180" height="120" class="ph-logo-wide"><h1>Tienda de equipos de protección</h1>
+  <p class="lead">${h(co.description)}</p></div>
+  <form class="search" role="search" action="/tienda"><label class="sr" for="q">Buscar producto</label>
+    <input id="q" name="q" value="${h(q)}" placeholder="Buscar: casco, guantes, chaleco…">${c ? `<input type="hidden" name="c" value="${h(c)}">` : ''}<button class="btn gold">Buscar</button></form></div></section>
+  <section class="wrap block">
+  <nav class="chips" aria-label="Categorías"><a href="/tienda${q ? `?q=${encodeURIComponent(q)}` : ''}" ${!c ? 'aria-current="true"' : ''}>Todo</a>${categories.map((k) => `<a href="/tienda?c=${h(k.slug)}${q ? `&q=${encodeURIComponent(q)}` : ''}" ${c === k.slug ? 'aria-current="true"' : ''}>${h(k.name)}</a>`).join('')}</nav>
+  <p class="note">Precios referenciales en soles. Confirmamos stock, tallas y entrega antes de cualquier pago.</p>
+  ${products.length ? `<div class="grid-prod">${products.map(productCard).join('')}</div>`
+    : `<div class="empty"><p>No encontramos productos para “${h(q)}”.</p><a class="btn ghost" href="/tienda">Ver todo el catálogo</a> <a class="btn wa" href="${wa(s.whatsapp, `Hola, busco: ${q}`)}" target="_blank" rel="noopener">${ICON.wa}Preguntar por WhatsApp</a></div>`}
+  </section>`;
+}
+
+export function productPage(s, p, related) {
+  return `<article class="wrap detail"><nav class="crumbs"><a href="/tienda">Tienda</a> / ${h(p.category || '')}</nav>
+  <div class="detail-grid prod-detail"><figure class="frame sq"><img src="${h(p.image)}" alt="${h(p.name)}" fetchpriority="high"></figure>
+  <div><h1>${h(p.name)}</h1><p class="price big">${money(p.price_cents)}</p><p class="avail-line">Disponibilidad: <b>${h(p.availability)}</b></p>
+  <p>${h(p.description)}</p>${p.variants ? `<p>Opciones: ${h(p.variants)}</p>` : ''}
+  ${p.availability === 'agotado' ? '' : `<div class="buy"><label>Cantidad<input type="number" min="1" max="999" value="1" data-qty></label>
+  <button class="btn gold" data-add='${h(JSON.stringify({ slug: p.slug, name: p.name, price: p.price_cents, image: p.image }))}'>Agregar al pedido</button></div>`}
+  <a class="btn wa ghost" href="${wa(s.whatsapp, `Hola, me interesa: ${p.name} (${money(p.price_cents)}).`)}" target="_blank" rel="noopener">${ICON.wa}Consultar por WhatsApp</a>
+  <p class="note">Sin cargos ocultos: el costo de envío, si aplica, te lo confirmamos antes de pagar.</p></div></div></article>
+  ${related.length ? `<section class="wrap block"><h2 class="h3">También en ${h(p.category || 'la tienda')}</h2><div class="grid-prod">${related.map(productCard).join('')}</div></section>` : ''}`;
+}
+
+export function cartPage(s, catalog) {
+  return `<section class="wrap detail cart"><h1>Tu pedido</h1>
+  <p class="lead">Revisa los productos y envíanos la solicitud. Te confirmamos stock, total y entrega por WhatsApp o llamada. Aún no cobramos en línea.</p>
+  <div data-cart-root><p class="loading">Cargando tu pedido…</p></div>
+  <script type="application/json" id="catalog">${JSON.stringify(catalog).replace(/</g, '\\u003c')}</script>
+  <form class="form order" method="post" action="/pedido" data-order hidden>
+    <input type="hidden" name="items"><input type="hidden" name="_t" value="${Date.now()}">
+    <div class="hp" aria-hidden="true"><label>No llenar <input name="website" tabindex="-1" autocomplete="off"></label></div>
+    <h2 class="h3">Datos para confirmar</h2>
+    <div class="row2"><label>Nombre<input name="name" required maxlength="120" autocomplete="name"></label>
+    <label>Teléfono o WhatsApp<input name="phone" required maxlength="30" inputmode="tel" autocomplete="tel"></label></div>
+    <fieldset class="opts"><legend>Entrega</legend>
+      <label><input type="radio" name="delivery" value="recojo" checked> Recojo (te indicamos el punto)</label>
+      <label><input type="radio" name="delivery" value="envio"> Envío (costo según destino, se confirma antes de pagar)</label></fieldset>
+    <label>Notas <i>(tallas, destino, factura)</i><textarea name="message" maxlength="1500" rows="3"></textarea></label>
+    <p class="form-msg" role="status" aria-live="polite"></p>
+    <button class="btn gold" type="submit">Enviar solicitud de pedido</button></form></section>`;
+}
+
+export function orderDone(s, lead, items) {
+  const text = `Hola, envié el pedido N.° ${lead.id}:\n${items.map((i) => `• ${i.qty} x ${i.name}`).join('\n')}\nTotal referencial: ${money(lead.total_cents)}`;
+  return `<section class="wrap detail done"><h1>Pedido N.° ${lead.id} recibido</h1>
+  <p class="lead">Gracias, ${h(lead.name)}. Te contactaremos al ${h(lead.phone)} para confirmar stock, entrega y forma de pago.</p>
+  <ul class="sum">${items.map((i) => `<li><span>${i.qty} × ${h(i.name)}</span><b>${money(i.price == null ? null : i.price * i.qty)}</b></li>`).join('')}
+  <li class="tot"><span>Total referencial</span><b>${money(lead.total_cents)}</b></li></ul>
+  <a class="btn wa" href="${wa(s.whatsapp, text)}" target="_blank" rel="noopener">${ICON.wa}Avisar por WhatsApp</a> <a class="btn ghost" href="/tienda">Seguir viendo productos</a>
+  <div data-clear-cart hidden></div></section>`;
+}
+
+export function portfolioPage(s, projects) {
+  const profile = s.owner_name ? `<section class="wrap profile reveal">${frame(s.owner_photo, s.owner_name, 'portrait')}
+    <div><p class="kicker">${h(s.owner_role)}</p><h2>${h(s.owner_name)}</h2>${lines(s.owner_bio).map((l) => `<p>${h(l)}</p>`).join('')}</div></section>` : '';
+  const areas = [...new Set(projects.map((p) => p.area).filter(Boolean))];
+  return `<section class="page-head wrap"><div><p class="kicker">Portafolio</p><h1>Trabajos en campo</h1>
+  <p class="lead">Proyectos y actividades ejecutadas, con fotos reales de obra, monitoreo y talleres.</p></div></section>${profile}
+  <section class="wrap block"><nav class="chips" aria-label="Filtrar por área" data-filter><button aria-pressed="true" data-f="">Todo</button>${areas.map((a) => `<button aria-pressed="false" data-f="${h(a)}">${h(a)}</button>`).join('')}</nav>
+  <div class="pj-grid">${projects.map((p) => `<a class="pj reveal" data-area="${h(p.area)}" href="/portafolio/${h(p.slug)}">${frame(sm(p.image), p.title)}
+    <span class="pj-meta">${h(p.area)}${p.period ? ' · ' + h(p.period) : ''}</span><h3>${h(p.title)}</h3></a>`).join('')}</div></section>
+  ${contactBand(s, { kind: 'cotizacion', subject: 'Proyecto similar' })}`;
+}
+
+export function projectPage(s, p) {
+  const gal = lines(p.gallery);
+  return `<article class="wrap detail"><nav class="crumbs"><a href="/portafolio">Portafolio</a> / ${h(p.area)}</nav>
+  <h1>${h(p.title)}</h1><p class="pj-meta">${h(p.area)}${p.period ? ' · ' + h(p.period) : ''}${p.place ? ' · ' + h(p.place) : ''}</p>
+  <p class="lead">${h(p.summary)}</p>${frame(p.image, p.title, 'wide', true)}
+  ${gal.length ? `<div class="gal">${gal.map((g) => frame(g, p.title)).join('')}</div>` : ''}
+  <p><a class="btn" href="/contacto?asunto=${encodeURIComponent('Proyecto similar a: ' + p.title)}">Solicitar un proyecto similar</a></p></article>`;
+}
+
+export function contactPage(s, subject) {
+  return `<section class="page-head wrap"><div><p class="kicker">Contacto</p><h1>Hablemos de tu proyecto o pedido</h1></div></section>
+  ${contactBand(s, { kind: 'contacto', subject })}`;
+}
+
+export function message(title, text, back = '/') {
+  return `<section class="wrap detail done"><h1>${h(title)}</h1><p class="lead">${h(text)}</p><a class="btn" href="${h(back)}">Volver</a></section>`;
+}

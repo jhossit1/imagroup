@@ -1,0 +1,6 @@
+node_modules
+data
+drive_originales
+.git
+tmp.log
+*.log
