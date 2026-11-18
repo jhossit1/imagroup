@@ -20,7 +20,7 @@ export function layout(s, { title, desc, path = '/', body, theme = '' }) {
 ${s.review_banner === '1' ? '<meta name="robots" content="noindex">' : ''}
 <link rel="icon" href="/img/brand/imagroup.webp"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/site.css?v=4"></head>
+<link rel="stylesheet" href="/css/site.css?v=5"></head>
 <body class="${theme}">
 <a class="skip" href="#main">Saltar al contenido</a>
 ${s.review_banner === '1' ? '<div class="review">Versión de revisión. Los pagos en línea aún no están habilitados: los pedidos se confirman por WhatsApp o teléfono.</div>' : ''}
@@ -33,6 +33,12 @@ ${s.review_banner === '1' ? '<div class="review">Versión de revisión. Los pago
   <button class="menu-btn" aria-expanded="false" aria-controls="nav"><span></span><span></span><span class="sr">Menú</span></button></div>
 </div></header>
 <main id="main">${body}</main>
+<nav class="mobile-tabs" aria-label="Navegación principal">
+  <a href="/"${path === '/' ? ' aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"/></svg><span>Inicio</span></a>
+  <a href="/servicios"${path.startsWith('/servicios') ? ' aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V8l8-5 8 5v12H4Z"/><path d="M9 20v-7h6v7M4 10h16"/></svg><span>Servicios</span></a>
+  <a href="/tienda"${path.startsWith('/tienda') ? ' aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h16l-1 12H5L4 9ZM8 10V7a4 4 0 0 1 8 0v3"/></svg><span>Tienda</span></a>
+  <a href="/contacto"${path.startsWith('/contacto') ? ' aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM4 6l8 7 8-7"/></svg><span>Contacto</span></a>
+</nav>
 <footer class="foot"><div class="wrap foot-in">
   <div><img src="/img/brand/imagroup.webp" alt="Imagroup" width="40" height="52"><img src="/img/brand/gregorian-sq.webp" alt="Gregorian" width="96" height="64"></div>
   <div class="foot-cols">
@@ -43,7 +49,7 @@ ${s.review_banner === '1' ? '<div class="review">Versión de revisión. Los pago
   <p class="fine">© ${new Date().getFullYear()} Imagroup S.A.C. ${s.facebook ? `· <a href="${h(s.facebook)}" rel="noopener">Facebook</a>` : ''}</p>
 </div></footer>
 <a class="wa-float" href="${wa(s.whatsapp, 'Hola, vengo de la web de Imagroup.')}" target="_blank" rel="noopener" aria-label="Escribir por WhatsApp">${ICON.wa}</a>
-<script src="/js/site.js?v=4" defer></script></body></html>`;
+<script src="/js/site.js?v=5" defer></script></body></html>`;
 }
 
 const frame = (src, alt, cls = '', eager = false) =>
