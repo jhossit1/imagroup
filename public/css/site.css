@@ -721,3 +721,7 @@ html { overflow-x: clip; }
 @keyframes vfin { from { opacity: 0; transform: translateY(24px) scale(.96); } }
 @keyframes vfpop { from { transform: scale(0) rotate(-40deg); } }
 @media (prefers-reduced-motion: reduce) { .vf-card, .vf-ico { animation: none; } }
+.vf-photo { display: block; width: 120px; height: 146px; object-fit: cover; margin: 0 auto 14px; border-radius: 16px; border: 4px solid #fff; box-shadow: 0 16px 30px -14px rgb(20 32 44 / .5); animation: vfpop .6s .1s cubic-bezier(.34,1.56,.64,1) both; }
+.vf-msg { font-size: 1.05rem; margin: -6px 0 16px; }
+.vf-trust { display: inline-block; margin: 0 0 16px; padding: 4px 14px; border-radius: 99px; background: var(--leaf); color: #fff; font-weight: 700; font-size: .9rem; }
+.vf-at { margin: 18px 0 0; font-size: .82rem; color: var(--muted); }

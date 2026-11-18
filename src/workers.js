@@ -4,12 +4,18 @@ import { all, get, run, audit, settings } from './db.js';
 import { h, money } from './views.js';
 import { CRITERIA, LEVELS, levelOf, evaluate, isTrusted, TRUST_RULE, periodName } from './method.js';
 import { certificatePdf } from './cert.js';
+import { badgePdf } from './badge.js';
+import QRCode from 'qrcode';
 
 const thisPeriod = () => new Date(Date.now() - 5 * 36e5).toISOString().slice(0, 7);
 const STATUS = ['activo', 'disponible', 'inactivo'];
 const HUES = ['#1a5f99', '#3d8a37', '#c9a24a', '#c2467a', '#2f86cc'];
 const initials = (n) => String(n).trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
-const avatar = (w, big = '') => `<span class="w-av${big}" style="--hue:${HUES[w.id % HUES.length]}">${h(initials(w.name))}</span>`;
+const avatar = (w, big = '') => (w.photo ? `<img class="w-av${big}" src="${h(w.photo)}" alt="" style="--hue:${HUES[w.id % HUES.length]}">` : `<span class="w-av${big}" style="--hue:${HUES[w.id % HUES.length]}">${h(initials(w.name))}</span>`);
+const qrSvg = (t) => { const q = QRCode.create(t, { errorCorrectionLevel: 'M' }), n = q.modules.size; let d = ''; for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (q.modules.data[y * n + x]) d += `M${x} ${y}h1v1h-1z`; return `<svg viewBox="0 0 ${n} ${n}" shape-rendering="crispEdges" aria-hidden="true"><path d="${d}"/></svg>`; };
+const today = () => new Date(Date.now() - 5 * 36e5).toISOString().slice(0, 10);
+const dmy = (iso) => String(iso).slice(0, 10).split('-').reverse().join('/');
+const baseUrl = (req) => `${req.get('x-forwarded-proto') === 'https' ? 'https' : req.protocol}://${req.get('host')}`;
 const ring = (score, lv, size = '') => `<span class="w-ring${size}" style="--p:${score || 0};--lc:${levelOf(lv).c}"><svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="16" pathLength="100"/><circle cx="20" cy="20" r="16" pathLength="100"/></svg><b>${score == null ? '—' : Math.round(score)}</b></span>`;
 const chip = (lv) => { const l = levelOf(lv); return `<span class="w-lv lv-${l.k}">${h(l.t)}</span>`; };
 const trustBadge = '<span class="w-trust" title="' + h(TRUST_RULE) + '">★ De confianza</span>';
@@ -41,7 +47,7 @@ export function mountWorkers(r, { shell, ic, csrf }) {
       avg: get(`SELECT ROUND(AVG(score)) n FROM evaluations WHERE period = ?`, cur).n,
       bono: get(`SELECT COALESCE(SUM(bonus_cents),0) n FROM evaluations WHERE period = ? AND status = 'aprobado'`, cur).n,
     };
-    const podium = per ? all(`SELECT e.score, e.level, w.id, w.name, w.trade FROM evaluations e JOIN workers w ON w.id = e.worker_id WHERE e.period = ? AND e.status = 'aprobado' ORDER BY e.score DESC LIMIT 3`, per) : [];
+    const podium = per ? all(`SELECT e.score, e.level, w.id, w.name, w.trade, w.photo FROM evaluations e JOIN workers w ON w.id = e.worker_id WHERE e.period = ? AND e.status = 'aprobado' ORDER BY e.score DESC LIMIT 3`, per) : [];
     const order = [podium[1], podium[0], podium[2]];
     res.send(shell(req, 'Trabajadores', `<div class="a-head w-top"><div><p class="d-eye">Equipo de obra · ${h(periodName(cur))}</p><h1 class="grad">Trabajadores</h1></div>
     <div class="w-acts"><a class="a-btn ghost" href="/admin/trabajadores/metodologia">${ic('shield')}Metodología</a><a class="a-btn" href="/admin/trabajadores/nuevo">${ic('plus')}Agregar trabajador</a></div></div>
@@ -78,8 +84,11 @@ export function mountWorkers(r, { shell, ic, csrf }) {
   // ---- Alta y edición ----
   const wform = (req, w, err = '') => shell(req, w.id ? 'Editar trabajador' : 'Nuevo trabajador', `<p><a href="/admin/trabajadores${w.id ? '/' + w.id : ''}">← ${w.id ? h(w.name) : 'Trabajadores'}</a></p>
     <h1 class="grad">${w.id ? 'Editar ficha' : 'Nuevo trabajador'}</h1>${err ? `<p class="a-err" role="alert">${h(err)}</p>` : ''}
-    <form class="a-card a-form w-form" method="post" action="/admin/trabajadores/${w.id || 'nuevo'}">${csrf(req)}
+    <form class="a-card a-form w-form" method="post" enctype="multipart/form-data" action="/admin/trabajadores/${w.id || 'nuevo'}">${csrf(req)}
     <label>Nombre completo<input name="name" required maxlength="120" value="${h(w.name)}" autocomplete="off"></label>
+    <div class="w-photo">${w.photo ? `<img src="${h(w.photo)}" alt="">` : `<span class="w-photo-ph">${ic('users')}</span>`}<input type="hidden" name="photo" value="${h(w.photo)}">
+      <label>Foto para el carné <small>(opcional) JPG o PNG, de frente y con fondo claro. Máx. 4 MB.</small><input type="file" name="photo__file" accept="image/jpeg,image/png"></label>
+      ${w.photo ? '<label class="a-check"><input type="checkbox" name="photo_rm" value="1"> Quitar foto</label>' : ''}</div>
     <div class="w-2"><label>Oficio o especialidad<input name="trade" maxlength="80" value="${h(w.trade)}" placeholder="Operario, maestro de obra, chofer…"></label>
     <label>Zona u obra<input name="zone" maxlength="80" value="${h(w.zone)}"></label></div>
     <div class="w-2"><label>Teléfono <small>(opcional)</small><input name="phone" inputmode="tel" maxlength="20" value="${h(w.phone)}"></label>
@@ -96,6 +105,7 @@ export function mountWorkers(r, { shell, ic, csrf }) {
     const b = req.body, v = { name: String(b.name || '').trim().slice(0, 120), trade: String(b.trade || '').trim().slice(0, 80), zone: String(b.zone || '').trim().slice(0, 80),
       phone: String(b.phone || '').replace(/[^\d +]/g, '').slice(0, 20), joined: /^\d{4}-\d{2}-\d{2}$/.test(b.joined) ? b.joined : '',
       company_id: get('SELECT id FROM companies WHERE id = ?', +b.company_id)?.id || 1, status: STATUS.includes(b.status) ? b.status : 'activo', notes: String(b.notes || '').slice(0, 2000) };
+    v.photo = req.file ? '/uploads/' + req.file.filename : b.photo_rm ? '' : /^\/uploads\/[a-f0-9]+\.(jpe?g|png)$/.test(b.photo || '') ? b.photo : '';
     if (!v.name) return res.status(400).send(wform(req, { ...v, id: w.id }, 'Escribe el nombre completo.'));
     const keys = Object.keys(v);
     let id = w.id;
@@ -109,6 +119,9 @@ export function mountWorkers(r, { shell, ic, csrf }) {
     const w = load(req.params.id); if (!w) return next();
     const evs = all('SELECT * FROM evaluations WHERE worker_id = ? ORDER BY period DESC', w.id);
     const certs = all('SELECT * FROM certificates WHERE worker_id = ? ORDER BY id DESC', w.id);
+    const badges = all('SELECT * FROM badges WHERE worker_id = ? ORDER BY id DESC', w.id), active = badges.find((x) => !x.revoked_at && x.expires >= today());
+    const coFull = get('SELECT * FROM companies WHERE id = ?', w.company_id) || {};
+    const nextYear = new Date(Date.now() + 365 * 864e5).toISOString().slice(0, 10);
     const co = get('SELECT name FROM companies WHERE id = ?', w.company_id);
     const last = evs[0], trusted = isTrusted(evs), approved = evs.filter((e) => e.status === 'aprobado');
     const hist = evs.slice(0, 12).reverse();
@@ -129,7 +142,23 @@ export function mountWorkers(r, { shell, ic, csrf }) {
         <span class="w-ev-a">${e.status === 'propuesto' ? `<form method="post" action="/admin/evaluaciones/${e.id}/aprobar">${csrf(req)}<button class="a-btn sm">Aprobar</button></form><a class="a-btn ghost sm" href="/admin/trabajadores/${w.id}/evaluar?periodo=${e.period}">Editar</a>` : ''}
         ${e.status !== 'revocado' ? `<details class="w-rev"><summary>Revocar</summary><form method="post" action="/admin/evaluaciones/${e.id}/revocar">${csrf(req)}<input name="reason" required maxlength="300" placeholder="Motivo de la revocación"><button class="a-btn danger sm">Confirmar</button></form></details>` : `<small class="a-muted">${h(e.revoke_reason || '')}</small>`}</span>
         <p class="w-ev-r">${h(e.reason || '')} <small>— ${h(e.evaluator || '')}${e.decided_by ? `, ${h(e.status)} por ${h(e.decided_by)}` : ''}</small></p></li>`).join('')}</ul>` : '<p class="d-empty">Todavía no hay evaluaciones.</p>'}</section>
-    <section class="card rise w-certs" style="--i:4"><header><h2>Certificados</h2></header>
+    <section class="card rise w-badge" style="--i:4" id="carne"><header><h2>Carné de identificación</h2>${active ? `<span class="a-pill s-confirmado">vigente hasta ${dmy(active.expires)}</span>` : '<span class="a-pill s-nuevo">sin carné vigente</span>'}</header>
+      <div class="bc-wrap"><button type="button" class="bc" data-flip aria-label="Girar el carné para ver el reverso">
+        <span class="bc-face bc-front"><span class="bc-head"><img src="${h(coFull.logo || '/img/brand/imagroup.webp')}" alt=""><span><b>${h(coFull.name || '')}</b><small>Carné de identificación</small></span></span>
+          <span class="bc-photo">${w.photo ? `<img src="${h(w.photo)}" alt="">` : `<span style="--hue:${HUES[w.id % HUES.length]}">${h(initials(w.name))}</span>`}</span>
+          <b class="bc-name">${h(w.name)}</b>${w.trade ? `<span class="bc-trade">${h(w.trade)}</span>` : ''}${w.zone ? `<small class="bc-zone">${h(w.zone)}</small>` : ''}${trusted ? '<span class="bc-trust">Trabajador de confianza</span>' : ''}
+          <span class="bc-foot"><span><small>N.° de carné</small>${active ? h(active.code) : '—'}<small>Válido hasta</small>${active ? dmy(active.expires) : '—'}</span><span class="bc-qr">${active ? qrSvg(`${baseUrl(req)}/verificar/${active.code}`) : ''}</span></span></span>
+        <span class="bc-face bc-back"><span class="bc-stripe"></span><b>Verifique este carné</b><span class="bc-bigqr">${active ? qrSvg(`${baseUrl(req)}/verificar/${active.code}`) : '<em>Genera el carné para crear su QR</em>'}</span>
+          <small>Escanee el código con la cámara del celular para comprobar que este carné es válido y que la persona trabaja con nosotros.</small><span class="bc-sign">${h(coFull.signer_name || coFull.signer_role || 'Gerencia General')}</span></span>
+      </button><p class="a-help bc-tip">Toca el carné para girarlo.</p></div>
+      <div class="bc-side"><ol class="bc-steps"><li><b>Genera</b> el carné con su fecha de vencimiento.</li><li><b>Imprime</b> la hoja A4 a tamaño real o lleva el PDF tamaño tarjeta a una imprenta de fotochecks.</li><li><b>Recorta, pega y plastifica.</b> El trabajador lo lleva visible en obra.</li><li><b>Cualquiera lo verifica</b> escaneando el QR: verá si está vigente.</li></ol>
+        <form class="w-issue bc-form" method="post" action="/admin/trabajadores/${w.id}/carne">${csrf(req)}<label>Válido hasta<input type="date" name="expires" required value="${nextYear}" min="${today()}"></label>
+          <button class="a-btn" ${active ? `data-confirm="Se anulará el carné ${h(active.code)} y se creará uno nuevo. ¿Continuar?"` : ''}>${ic('plus')}${active ? 'Reemplazar carné' : 'Generar carné'}</button></form>
+        ${w.photo ? '' : `<p class="a-help">Sin foto, el carné muestra sus iniciales. <a href="/admin/trabajadores/${w.id}/editar">Agregar foto</a></p>`}
+        ${badges.length ? `<ul class="w-cl">${badges.map((x) => `<li class="${x.revoked_at || x.expires < today() ? 'rev' : ''}"><span class="d-ico">${ic('users')}</span><span><b>Carné ${h(x.code)}</b><small>Emitido ${dmy(x.issued_at)} · vence ${dmy(x.expires)}${x.revoked_at ? ` · anulado: ${h(x.revoked_reason)}` : x.expires < today() ? ' · vencido' : ''}</small></span>
+          <span class="w-ev-a">${x.revoked_at ? '' : `<a class="a-btn sm" href="/admin/carnes/${h(x.code)}.pdf?hoja=1">${ic('down')}Hoja A4</a><a class="a-btn ghost sm" href="/admin/carnes/${h(x.code)}.pdf">${ic('down')}PDF tarjeta</a>`}<a class="a-btn ghost sm" href="/verificar/${h(x.code)}" target="_blank" rel="noopener">Verificar</a>
+          ${x.revoked_at ? '' : `<details class="w-rev"><summary>Anular</summary><form method="post" action="/admin/carnes/${h(x.code)}/anular">${csrf(req)}<input name="reason" required maxlength="300" placeholder="Motivo (pérdida, cese…)"><button class="a-btn danger sm">Anular</button></form></details>`}</span></li>`).join('')}</ul>` : ''}</div></section>
+    <section class="card rise w-certs" style="--i:5"><header><h2>Certificados</h2></header>
       <form class="w-issue" method="post" action="/admin/trabajadores/${w.id}/certificado">${csrf(req)}
         <label>Tipo<select name="kind"><option value="confianza">Trabajador de confianza${trusted ? ' (cumple la regla)' : ''}</option><option value="excelencia" ${approved.length ? '' : 'disabled'}>Reconocimiento a la excelencia</option></select></label>
         <label>Evaluación que lo respalda<select name="evaluation_id"><option value="">Ninguna</option>${approved.map((e) => `<option value="${e.id}">${h(periodName(e.period))} · ${Math.round(e.score)} pts · ${h(levelOf(e.level).t)}</option>`).join('')}</select></label>
@@ -212,6 +241,30 @@ export function mountWorkers(r, { shell, ic, csrf }) {
     res.type('pdf').attachment(`certificado-${initials(w.name).toLowerCase()}-${c.code}.pdf`);
     certificatePdf(res, { c, w, co, ev, url: `${base}/verificar/${c.code}` });
   });
+  // ---- Carnés ----
+  r.post('/trabajadores/:id/carne', (req, res, next) => {
+    const w = load(req.params.id); if (!w) return next();
+    const exp = /^\d{4}-\d{2}-\d{2}$/.test(req.body.expires) && req.body.expires >= today() ? req.body.expires : new Date(Date.now() + 365 * 864e5).toISOString().slice(0, 10);
+    const code = crypto.randomBytes(5).toString('hex').toUpperCase().replace(/(.{5})/, '$1-');
+    run(`UPDATE badges SET revoked_at = ?, revoked_reason = ? WHERE worker_id = ? AND revoked_at IS NULL`, new Date().toISOString(), 'Reemplazado por ' + code, w.id);
+    run('INSERT INTO badges (code, worker_id, expires, issued_by) VALUES (?,?,?,?)', code, w.id, exp, req.admin.username);
+    audit(req.admin.username, 'badge', 'workers', w.id, `${code} vence ${exp}`);
+    res.redirect(`/admin/trabajadores/${w.id}#carne`);
+  });
+  r.get('/carnes/:file', (req, res, next) => {
+    const m = /^([A-F0-9]{5}-[A-F0-9]{5})\.pdf$/.exec(req.params.file); if (!m) return next();
+    const b = get('SELECT * FROM badges WHERE code = ?', m[1]); if (!b) return next();
+    const w = load(b.worker_id), co = get('SELECT * FROM companies WHERE id = ?', w.company_id) || get('SELECT * FROM companies WHERE id = 1');
+    const trusted = isTrusted(all('SELECT period, score, status FROM evaluations WHERE worker_id = ?', w.id));
+    res.type('pdf').attachment(`carne-${initials(w.name).toLowerCase()}-${b.code}${req.query.hoja ? '-a4' : ''}.pdf`);
+    badgePdf(res, { b, w, co, s: settings(), trusted, url: `${baseUrl(req)}/verificar/${b.code}` }, !!req.query.hoja);
+  });
+  r.post('/carnes/:code/anular', (req, res, next) => {
+    const b = get('SELECT * FROM badges WHERE code = ?', req.params.code); if (!b) return next();
+    const reason = String(req.body.reason || '').trim().slice(0, 300);
+    if (reason && !b.revoked_at) { run('UPDATE badges SET revoked_at = ?, revoked_reason = ? WHERE id = ?', new Date().toISOString(), reason, b.id); audit(req.admin.username, 'revoke', 'workers', b.worker_id, `carné ${b.code}: ${reason}`); }
+    res.redirect(`/admin/trabajadores/${b.worker_id}#carne`);
+  });
   r.post('/certificados/:code/anular', (req, res, next) => {
     const c = get('SELECT * FROM certificates WHERE code = ?', req.params.code); if (!c) return next();
     const reason = String(req.body.reason || '').trim().slice(0, 300);
@@ -222,7 +275,14 @@ export function mountWorkers(r, { shell, ic, csrf }) {
 
 // Verificación pública: solo nombre, título, empresa, periodo, fecha y vigencia. Nunca la ficha laboral.
 export function verifyData(code) {
+  code = String(code).toUpperCase();
   const c = get(`SELECT c.code, c.title, c.issued_at, c.revoked_at, w.name, co.name AS company, e.period FROM certificates c JOIN workers w ON w.id = c.worker_id
-    LEFT JOIN companies co ON co.id = c.company_id LEFT JOIN evaluations e ON e.id = c.evaluation_id WHERE c.code = ?`, String(code).toUpperCase());
-  return c && { ...c, period: periodName(c.period) };
+    LEFT JOIN companies co ON co.id = c.company_id LEFT JOIN evaluations e ON e.id = c.evaluation_id WHERE c.code = ?`, code);
+  if (c) return { type: 'cert', ...c, state: c.revoked_at ? 'anulado' : 'valido', period: periodName(c.period) };
+  const b = get(`SELECT b.*, w.name, w.trade, w.photo, w.status, w.id AS wid, co.name AS company FROM badges b JOIN workers w ON w.id = b.worker_id
+    LEFT JOIN companies co ON co.id = w.company_id WHERE b.code = ?`, code);
+  if (!b) return null;
+  const state = b.revoked_at ? 'anulado' : b.expires < today() ? 'vencido' : b.status === 'inactivo' ? 'inactivo' : 'valido';
+  return { type: 'carne', code: b.code, name: b.name, trade: b.trade, photo: b.photo, company: b.company, expires: dmy(b.expires), issued_at: b.issued_at, state,
+    trusted: state === 'valido' && isTrusted(all('SELECT period, score, status FROM evaluations WHERE worker_id = ?', b.wid)) };
 }

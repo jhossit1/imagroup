@@ -50,3 +50,6 @@ if (matchMedia('(hover: hover) and (prefers-reduced-motion: no-preference)').mat
   c.addEventListener('pointermove', (e) => { const r = c.getBoundingClientRect(); c.style.setProperty('--ry', ((e.clientX - r.left) / r.width - .5) * 8 + 'deg'); c.style.setProperty('--rx', (.5 - (e.clientY - r.top) / r.height) * 8 + 'deg'); });
   c.addEventListener('pointerleave', () => { c.style.removeProperty('--rx'); c.style.removeProperty('--ry'); });
 });
+
+// Carné: girar para ver el reverso.
+document.querySelectorAll("[data-flip]").forEach((b) => b.addEventListener("click", () => b.classList.toggle("flip")));

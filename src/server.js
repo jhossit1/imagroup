@@ -74,16 +74,21 @@ app.get('/portafolio/:slug', (req, res, next) => {
   if (!p) return next();
   page(res, { title: p.title, desc: p.summary, path: '/portafolio', body: V.projectPage(settings(), p) });
 });
-// Verificación de certificados por QR: solo datos autorizados, nunca la ficha laboral.
+// Verificación por QR de certificados y carnés: solo datos autorizados, nunca la ficha laboral.
 app.get('/verificar/:code', (req, res) => {
-  const c = verifyData(String(req.params.code).slice(0, 20)), ok = c && !c.revoked_at;
+  const c = verifyData(String(req.params.code).slice(0, 20)), co = String(c?.company || '').replace(/[.]$/, ''), ok = c?.state === 'valido', e = V.h, isB = c?.type === 'carne';
+  const TIT = { valido: isB ? 'Carné válido' : 'Certificado válido', vencido: 'Carné vencido', anulado: isB ? 'Carné anulado' : 'Certificado anulado', inactivo: 'Ya no trabaja con nosotros' };
+  const MSG = { valido: isB ? `Esta persona trabaja con ${e(co)}.` : '', vencido: 'El carné superó su fecha de vigencia. Pida a la persona que lo renueve.', anulado: 'Este documento fue anulado y no debe aceptarse.', inactivo: `Esta persona ya no forma parte del equipo de ${e(co)}.` };
   res.status(c ? 200 : 404).set('X-Robots-Tag', 'noindex');
-  page(res, { title: 'Verificación de certificado', path: '/verificar', body: `<section class="vf"><div class="wrap"><div class="vf-card ${ok ? 'ok' : 'bad'}">
-    <span class="vf-ico" aria-hidden="true">${ok ? '✓' : '!'}</span><p class="eyebrow">Verificación de certificado</p>
-    <h1>${c ? (ok ? 'Certificado válido' : 'Certificado anulado') : 'Código no encontrado'}</h1>
-    ${c ? `<dl><dt>Otorgado a</dt><dd>${V.h(c.name)}</dd><dt>Reconocimiento</dt><dd>${V.h(c.title)}</dd><dt>Empresa</dt><dd>${V.h(c.company || '')}</dd>
-    ${c.period ? `<dt>Periodo</dt><dd>${V.h(c.period)}</dd>` : ''}<dt>Emitido</dt><dd>${V.h(c.issued_at.slice(0, 10))}</dd><dt>Código</dt><dd>${V.h(c.code)}</dd></dl>`
-    : '<p>Revisa que el código esté bien escrito. Si el problema sigue, contáctanos.</p>'}</div></div></section>` });
+  page(res, { title: 'Verificación', path: '/verificar', body: `<section class="vf"><div class="wrap"><div class="vf-card ${ok ? 'ok' : 'bad'}">
+    ${isB && c.photo ? `<img class="vf-photo" src="${e(c.photo)}" alt="Foto de ${e(c.name)}">` : ''}<span class="vf-ico" aria-hidden="true">${ok ? '✓' : '!'}</span><p class="eyebrow">Verificación de ${isB ? 'carné' : 'certificado'}</p>
+    <h1>${c ? TIT[c.state] : 'Código no encontrado'}</h1>${c && MSG[c.state] ? `<p class="vf-msg">${MSG[c.state]}</p>` : ''}
+    ${c?.trusted ? '<p class="vf-trust">★ Trabajador de confianza</p>' : ''}
+    ${!c ? '<p>Revisa que el código esté bien escrito. Si el problema sigue, contáctanos.</p>' : isB
+      ? `<dl><dt>Nombre</dt><dd>${e(c.name)}</dd>${c.trade ? `<dt>Oficio</dt><dd>${e(c.trade)}</dd>` : ''}<dt>Empresa</dt><dd>${e(c.company || '')}</dd><dt>Válido hasta</dt><dd>${e(c.expires)}</dd><dt>Carné</dt><dd>${e(c.code)}</dd></dl>`
+      : `<dl><dt>Otorgado a</dt><dd>${e(c.name)}</dd><dt>Reconocimiento</dt><dd>${e(c.title)}</dd><dt>Empresa</dt><dd>${e(c.company || '')}</dd>
+    ${c.period ? `<dt>Periodo</dt><dd>${e(c.period)}</dd>` : ''}<dt>Emitido</dt><dd>${e(c.issued_at.slice(0, 10))}</dd><dt>Código</dt><dd>${e(c.code)}</dd></dl>`}
+    <p class="vf-at">Consultado el ${new Date().toLocaleString('es-PE', { timeZone: 'America/Lima', dateStyle: 'long', timeStyle: 'short' })}</p></div></div></section>` });
 });
 app.get('/contacto', (req, res) => page(res, { title: 'Contacto', path: '/contacto', body: V.contactPage(settings(), String(req.query.asunto || '').slice(0, 140)) }));
 

@@ -50,6 +50,10 @@ const MIGRATIONS = [
    ALTER TABLE companies ADD COLUMN signer2_role TEXT DEFAULT 'Ingeniero responsable · CIP 285140';
    ALTER TABLE companies ADD COLUMN signature2 TEXT;
    INSERT OR IGNORE INTO settings (key, value) VALUES ('bono_oro', '300'), ('bono_plata', '200'), ('bono_bronce', '100');`,
+  // v0.3: carné físico con QR y foto opcional del trabajador.
+  `ALTER TABLE workers ADD COLUMN photo TEXT;
+   CREATE TABLE badges (id INTEGER PRIMARY KEY, code TEXT UNIQUE NOT NULL, worker_id INTEGER NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
+     expires TEXT NOT NULL, issued_by TEXT, issued_at TEXT DEFAULT (datetime('now')), revoked_at TEXT, revoked_reason TEXT);`,
 ];
 
 db.exec('CREATE TABLE IF NOT EXISTS _migrations (n INTEGER PRIMARY KEY)');

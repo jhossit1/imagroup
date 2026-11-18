@@ -84,7 +84,7 @@ const shell = (req, title, body) => {
   const head = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex"><meta name="color-scheme" content="light dark"><title>${h(title)} · Admin Imagroup</title><link rel="icon" href="/img/brand/imagroup.webp">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/admin.css?v=4"><link rel="stylesheet" href="/css/admin-team.css?v=2"><script src="/js/theme.js?v=7"></script><script src="/js/admin.js?v=4" defer></script></head>`;
+<link rel="stylesheet" href="/css/admin.css?v=4"><link rel="stylesheet" href="/css/admin-team.css?v=3"><script src="/js/theme.js?v=7"></script><script src="/js/admin.js?v=5" defer></script></head>`;
   const themeBtn = `<button type="button" class="ad-icon ad-theme" data-theme-btn aria-label="Cambiar entre modo claro y oscuro">${ic('sun')}${ic('moon')}</button>`;
   if (!req.admin) return `${head}<body class="ad-guest"><div class="ad-orbs" aria-hidden="true"><i></i><i></i><i></i></div>${themeBtn}<main class="ad-guest-main">${body}</main></body></html>`;
   const cur = req.originalUrl.split('?')[0].replace(/\/$/, '') || '/admin';
@@ -145,6 +145,9 @@ r.post('/setup', (req, res) => {
 
 // Multipart (fotos) se procesa antes de verificar CSRF, y solo con sesión iniciada.
 r.post('/:ent/:id', (req, res, next) => (req.admin && ENT[req.params.ent] ? upload.any()(req, res, next) : next()));
+// Foto del trabajador para el carné: solo JPG o PNG (el PDF no admite WebP).
+const photoUpload = multer({ storage: upload.storage, limits: { fileSize: 4 * 1024 * 1024, files: 1 }, fileFilter: (_q, f, cb) => cb(null, /^image\/(jpeg|png)$/.test(f.mimetype)) });
+r.post('/trabajadores/:id', (req, res, next) => (req.admin ? photoUpload.single('photo__file')(req, res, next) : next()));
 r.use(requireAdmin);
 r.post('/logout', (req, res) => { destroySession(req, res); res.redirect('/admin/login'); });
 mountWorkers(r, { shell: (...a) => shell(...a), ic: (n) => ic(n), csrf: (q) => csrf(q) });
@@ -176,7 +179,7 @@ r.get('/', (req, res) => {
   const tmax = Math.max(1, ...top.map((t) => t.n));
   const pct = prods ? Math.round((pub / prods) * 100) : 0;
   const today = new Intl.DateTimeFormat('es-PE', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Lima' }).format(new Date());
-  const ACT = { login: ['in', 'Ingresó al panel'], create: ['plus', 'Creó'], update: ['pen', 'Editó'], delete: ['x', 'Eliminó'], export: ['down', 'Exportó'], password_set: ['shield', 'Definió su contraseña'], evaluate: ['star', 'Evaluó a'], approve: ['star', 'Aprobó reconocimiento de'], revoke: ['x', 'Revocó'], certificate: ['shield', 'Emitió certificado a'] };
+  const ACT = { login: ['in', 'Ingresó al panel'], create: ['plus', 'Creó'], update: ['pen', 'Editó'], delete: ['x', 'Eliminó'], export: ['down', 'Exportó'], password_set: ['shield', 'Definió su contraseña'], evaluate: ['star', 'Evaluó a'], approve: ['star', 'Aprobó reconocimiento de'], revoke: ['x', 'Revocó'], certificate: ['shield', 'Emitió certificado a'], badge: ['users', 'Generó carné de'] };
   const ENTN = { products: 'un producto', categories: 'una categoría', services: 'un servicio', projects: 'un proyecto', companies: 'una empresa', settings: 'los ajustes', leads: 'solicitudes', workers: 'un trabajador', certificates: 'un certificado' };
   const count = (n, suf = '') => `<b data-count="${n}" data-suf="${suf}">${n}${suf}</b>`;
 

@@ -21,7 +21,7 @@ export function layout(s, { title, desc, path = '/', body, theme = '' }) {
 ${s.review_banner === '1' ? '<meta name="robots" content="noindex">' : ''}
 <link rel="icon" href="/img/brand/imagroup.webp"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/site.css?v=12"><script src="/js/theme.js?v=7"></script></head>
+<link rel="stylesheet" href="/css/site.css?v=13"><script src="/js/theme.js?v=7"></script></head>
 <body class="${theme}">
 <a class="skip" href="#main">Saltar al contenido</a>
 ${s.review_banner === '1' ? '<div class="review">Versión de revisión. Los pagos en línea aún no están habilitados: los pedidos se confirman por WhatsApp o teléfono.</div>' : ''}
