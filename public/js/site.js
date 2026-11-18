@@ -170,3 +170,27 @@
     t.addEventListener('input', fit);
   });
 })();
+
+// Portada del portafolio: profundidad que sigue al cursor y desplazamiento suave al bajar.
+(() => {
+  const ph = document.querySelector('[data-ph]');
+  if (!ph || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  let tx = 0, ty = 0, x = 0, y = 0, raf = 0;
+  const loop = () => {
+    x += (tx - x) * 0.08; y += (ty - y) * 0.08;
+    ph.style.setProperty('--mx', x.toFixed(3)); ph.style.setProperty('--my', y.toFixed(3));
+    raf = Math.abs(tx - x) > 0.001 || Math.abs(ty - y) > 0.001 ? requestAnimationFrame(loop) : 0;
+  };
+  ph.addEventListener('pointermove', (e) => {
+    if (e.pointerType !== 'mouse') return;
+    const r = ph.getBoundingClientRect();
+    tx = (e.clientX - r.left) / r.width - 0.5; ty = (e.clientY - r.top) / r.height - 0.5;
+    if (!raf) raf = requestAnimationFrame(loop);
+  });
+  ph.addEventListener('pointerleave', () => { tx = ty = 0; if (!raf) raf = requestAnimationFrame(loop); });
+  let sraf = 0;
+  addEventListener('scroll', () => {
+    if (sraf) return;
+    sraf = requestAnimationFrame(() => { sraf = 0; const s = Math.min(scrollY, innerHeight); ph.style.setProperty('--sy', s.toFixed(0)); });
+  }, { passive: true });
+})();

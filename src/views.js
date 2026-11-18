@@ -21,7 +21,7 @@ export function layout(s, { title, desc, path = '/', body, theme = '' }) {
 ${s.review_banner === '1' ? '<meta name="robots" content="noindex">' : ''}
 <link rel="icon" href="/img/brand/imagroup.webp"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/site.css?v=8"><script src="/js/theme.js?v=7"></script></head>
+<link rel="stylesheet" href="/css/site.css?v=10"><script src="/js/theme.js?v=7"></script></head>
 <body class="${theme}">
 <a class="skip" href="#main">Saltar al contenido</a>
 ${s.review_banner === '1' ? '<div class="review">Versión de revisión. Los pagos en línea aún no están habilitados: los pedidos se confirman por WhatsApp o teléfono.</div>' : ''}
@@ -50,7 +50,7 @@ ${s.review_banner === '1' ? '<div class="review">Versión de revisión. Los pago
   <p class="fine">© ${new Date().getFullYear()} Imagroup S.A.C. ${s.facebook ? `· <a href="${h(s.facebook)}" rel="noopener">Facebook</a>` : ''}</p>
 </div></footer>
 <a class="wa-float" href="${wa(s.whatsapp, 'Hola, vengo de la web de Imagroup.')}" target="_blank" rel="noopener" aria-label="Escribir por WhatsApp">${ICON.wa}</a>
-<script src="/js/site.js?v=8" defer></script></body></html>`;
+<script src="/js/site.js?v=10" defer></script></body></html>`;
 }
 
 const frame = (src, alt, cls = '', eager = false) =>
@@ -74,7 +74,7 @@ export function home(s, { companies, services, products, projects }) {
     <div class="routes rise">
       <a class="route" href="/servicios"><span>01</span>Servicios de ingeniería</a>
       <a class="route" href="/tienda"><span>02</span>Comprar equipos de protección</a>
-      <a class="route" href="/portafolio"><span>03</span>Ver trabajos realizados</a>
+      <a class="route" href="/portafolio"><span>03</span>Conocer al ingeniero a cargo</a>
     </div>
   </div>
   <div class="hero-media">${frame('/img/f/vial-2.webp', 'Cuadrilla en mantenimiento de un camino vecinal', 'tall wipe', true)}
@@ -105,7 +105,7 @@ export function home(s, { companies, services, products, projects }) {
 </section>
 
 <section class="wrap block">
-  <header class="sec-head reveal"><h2>Trabajos realizados</h2><a href="/portafolio" class="link">Portafolio completo</a></header>
+  <header class="sec-head reveal"><h2>Trabajos realizados</h2><a href="/portafolio" class="link">Ver portafolio</a></header>
   <div class="mosaic">${projects.slice(0, 3).map((p, i) => `<a class="pj reveal ${i === 0 ? 'big' : ''}" href="/portafolio/${h(p.slug)}">
     ${frame(i === 0 ? p.image : sm(p.image), p.title)}<span class="pj-meta">${h(p.area)}${p.period ? ' · ' + h(p.period) : ''}</span><h3>${h(p.title)}</h3></a>`).join('')}</div>
 </section>
@@ -211,20 +211,6 @@ export function orderDone(s, lead, items) {
   <div data-clear-cart hidden></div></section>`;
 }
 
-export function portfolioPage(s, projects) {
-  const P = PROFILE;
-  const profile = `<section class="wrap"><a class="pf-teaser reveal" href="/portafolio/${P.slug}">
-    <span class="pf-teaser-ph"><img src="${P.photo}" alt="${h(P.name)}" width="246" height="309" loading="lazy"></span>
-    <span class="pf-teaser-tx"><span class="pf-eyebrow">Responsable técnico · CIP ${P.cip}</span><b>Ing. ${h(P.first)} ${h(P.last)}</b>
-    <span>${h(P.intro)}</span><span class="pf-teaser-go">Ver presentación <i aria-hidden="true">→</i></span></span></a></section>`;
-  const areas = [...new Set(projects.map((p) => p.area).filter(Boolean))];
-  return `<section class="page-head wrap"><div><p class="kicker">Portafolio</p><h1>Trabajos en campo</h1>
-  <p class="lead">Proyectos y actividades ejecutadas, con fotos reales de obra, monitoreo y talleres.</p></div></section>${profile}
-  <section class="wrap block"><nav class="chips" aria-label="Filtrar por área" data-filter><button aria-pressed="true" data-f="">Todo</button>${areas.map((a) => `<button aria-pressed="false" data-f="${h(a)}">${h(a)}</button>`).join('')}</nav>
-  <div class="pj-grid">${projects.map((p) => `<a class="pj reveal" data-area="${h(p.area)}" href="/portafolio/${h(p.slug)}">${frame(sm(p.image), p.title)}
-    <span class="pj-meta">${h(p.area)}${p.period ? ' · ' + h(p.period) : ''}</span><h3>${h(p.title)}</h3></a>`).join('')}</div></section>
-  ${contactBand(s, { kind: 'cotizacion', subject: 'Proyecto similar' })}`;
-}
 
 export function projectPage(s, p) {
   const gal = lines(p.gallery);
@@ -264,23 +250,32 @@ export function profilePage(s) {
   const img = (n, alt = '') => `<img src="/img/f/${n}-sm.webp" alt="${h(alt)}" loading="lazy" decoding="async">`;
   const waP = (t) => wa(s.whatsapp, t);
   return `<div class="pf">
-  <section class="pf-hero"><div class="wrap pf-hero-in">
-    <div class="pf-hero-tx">
-      <nav class="pf-crumbs"><a href="/portafolio">Portafolio</a> / Presentación</nav>
-      <p class="pf-eyebrow rise" style="--d:0">${h(P.role)} · CIP ${P.cip}</p>
-      <h1 class="rise" style="--d:1">Soy <span class="pf-mark">${h(P.first)}</span> ${h(P.last)}</h1>
-      <p class="pf-intro rise" style="--d:2">${h(P.intro)}</p>
-      <div class="pf-cta rise" style="--d:3"><a class="btn gold" href="${waP('Hola Ing. ' + P.first + ', vengo de su presentación en la web de Imagroup.')}" target="_blank" rel="noopener">${ICON.wa}Escribir por WhatsApp</a><a class="btn pf-ghost" href="#trayectoria">Ver trayectoria</a></div>
+  <section class="ph" data-ph>
+    <div class="ph-glow" aria-hidden="true"></div>
+    <div class="ph-back" aria-hidden="true"><div>${[0, 1].map(() => `<span>INGENIERÍA AMBIENTAL · RESIDUOS SÓLIDOS · AGUA Y SANEAMIENTO · GESTIÓN MUNICIPAL · </span>`).join('')}</div></div>
+    <div class="wrap ph-in">
+      <div class="ph-tx">
+        <p class="pf-eyebrow rise" style="--d:0">Hola, soy</p>
+        <h1 class="ph-name" aria-label="Ingeniero ${h(P.name)}">
+          <span class="ph-l1" aria-hidden="true">${[...P.first.toUpperCase()].map((c, i) => `<i style="--i:${i}">${c}</i>`).join('')}</span>
+          <span class="ph-l2" aria-hidden="true">${[...'TENORIO'].map((c, i) => `<i style="--i:${i + 6}">${c}</i>`).join('')}</span>
+        </h1>
+        <p class="ph-role rise" style="--d:3">${h(P.role)} · <b>CIP ${P.cip}</b></p>
+        <p class="pf-intro rise" style="--d:4">${h(P.intro)}</p>
+        <div class="pf-cta rise" style="--d:5"><a class="btn gold" href="${waP('Hola Ing. ' + P.first + ', vengo de su presentación en la web de Imagroup.')}" target="_blank" rel="noopener">${ICON.wa}Escribir por WhatsApp</a><a class="btn pf-ghost" href="#trayectoria">Ver trayectoria <span aria-hidden="true">↓</span></a></div>
+      </div>
+      <figure class="ph-photo" data-depth="18"><img src="/img/brand/jhossi.webp" srcset="/img/brand/jhossi-sm.webp 560w, /img/brand/jhossi.webp 900w" sizes="(max-width: 760px) 92vw, 46vw" alt="Ing. ${h(P.name)}" width="900" height="1200" fetchpriority="high"></figure>
+      <ul class="ph-chips" aria-hidden="true" data-depth="34">${P.tags.slice(0, 4).map((t, i) => `<li style="--i:${i}">${h(t)}</li>`).join('')}</ul>
+      <p class="ph-vert" aria-hidden="true">Ingeniero ambiental — ${years}+ años</p>
+      <ul class="ph-facts rise" style="--d:6">
+        <li><i aria-hidden="true">+</i><b>${years}+ años</b><span>en gestión ambiental y municipal</span></li>
+        <li><i aria-hidden="true">+</i><b>${orgs} instituciones</b><span>municipalidades, MINAM y empresas</span></li>
+      </ul>
     </div>
-    <div class="pf-hero-ph">
-      <div class="pf-ring" aria-hidden="true"></div>
-      <figure class="pf-photo"><img src="${P.photo}" alt="Ing. ${h(P.name)}" width="246" height="309" fetchpriority="high"></figure>
-      <ul class="pf-tags" aria-label="Especialidades">${P.tags.map((t, i) => `<li style="--i:${i}">${h(t)}</li>`).join('')}</ul>
-      <p class="pf-badge"><b>${years}+</b> años en gestión ambiental</p>
-    </div>
-  </div>${marq(P.tags.concat(P.tools.map((t) => t[0]).slice(0, 4)))}</section>
+    <a class="ph-scroll" href="#cifras" aria-label="Bajar"><span></span></a>
+  </section>${marq(P.tags.concat(P.tools.map((t) => t[0]).slice(0, 4)))}
 
-  <section class="wrap pf-stats" aria-label="En cifras">
+  <section class="wrap pf-stats" id="cifras" aria-label="En cifras">
     ${[[years, '+', 'años de experiencia'], [P.jobs.length, '', 'cargos desempeñados'], [orgs, '', 'instituciones y empresas'], [P.study.length, '', 'estudios y capacitaciones']]
       .map(([n, suf, l]) => `<div class="reveal"><b data-count="${n}" data-suf="${suf}">${n}${suf}</b><span>${l}</span></div>`).join('')}
   </section>
@@ -310,7 +305,6 @@ export function profilePage(s) {
 
   <section class="pf-gal" aria-label="Fotos de trabajo en campo"><header class="wrap pf-head reveal"><p class="pf-eyebrow">En campo</p><h2>Fotos reales de <span class="pf-mark">obra y talleres</span></h2></header>
     ${[0, 1].map((r) => `<div class="pf-gal-row${r ? ' rev' : ''}"><div>${[0, 1].map((dup) => P.gallery.filter((_, i) => i % 2 === r).map((g) => `<figure${dup ? ' aria-hidden="true"' : ''}>${img(g, dup ? '' : 'Trabajo en campo de Imagroup')}</figure>`).join('')).join('')}</div></div>`).join('')}
-    <p class="wrap"><a class="link" href="/portafolio">Ver todos los proyectos</a></p>
   </section>
 
   <section class="pf-dark pf-end"><div class="wrap pf-end-in reveal">
