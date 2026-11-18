@@ -1,6 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import path from 'node:path';
+import { PRODUCT_COPY } from './copy-products.js';
 
 export const DATA_DIR = process.env.DATA_DIR || path.resolve('data');
 fs.mkdirSync(path.join(DATA_DIR, 'uploads'), { recursive: true });
@@ -8,6 +9,7 @@ fs.mkdirSync(path.join(DATA_DIR, 'uploads'), { recursive: true });
 export const db = new DatabaseSync(path.join(DATA_DIR, 'imagroup.db'));
 db.exec('PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;');
 
+const q = (s) => `'${String(s).replace(/'/g, "''")}'`;
 // Migraciones por versión: solo se agregan, nunca se editan las ya aplicadas.
 const MIGRATIONS = [
   `CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT);
@@ -54,6 +56,8 @@ const MIGRATIONS = [
   `ALTER TABLE workers ADD COLUMN photo TEXT;
    CREATE TABLE badges (id INTEGER PRIMARY KEY, code TEXT UNIQUE NOT NULL, worker_id INTEGER NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
      expires TEXT NOT NULL, issued_by TEXT, issued_at TEXT DEFAULT (datetime('now')), revoked_at TEXT, revoked_reason TEXT);`,
+  // Descripciones nuevas de la tienda: solo reemplaza las del sembrado inicial, no las editadas en el panel.
+  PRODUCT_COPY.map(([slug, old, txt]) => `UPDATE products SET description = ${q(txt)} WHERE slug = ${q(slug)} AND (description IS NULL OR description IN ('', ${q(old)}));`).join(' '),
 ];
 
 db.exec('CREATE TABLE IF NOT EXISTS _migrations (n INTEGER PRIMARY KEY)');

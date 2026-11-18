@@ -1,4 +1,5 @@
 // Plantillas públicas (HTML renderizado en servidor).
+import fs from 'node:fs';
 import { PROFILE } from './profile.js';
 export const h = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 export const money = (c) => (c == null ? 'Consultar' : 'S/ ' + (c / 100).toFixed(2));
@@ -21,7 +22,7 @@ export function layout(s, { title, desc, path = '/', body, theme = '' }) {
 ${s.review_banner === '1' ? '<meta name="robots" content="noindex">' : ''}
 <link rel="icon" href="/img/brand/imagroup.webp"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/site.css?v=13"><script src="/js/theme.js?v=7"></script></head>
+<link rel="stylesheet" href="/css/site.css?v=13">${theme === 'shop' ? '<link rel="stylesheet" href="/css/shop.css?v=4"><script src="/js/shop.js?v=3" defer></script>' : ''}<script src="/js/theme.js?v=7"></script></head>
 <body class="${theme}">
 <a class="skip" href="#main">Saltar al contenido</a>
 ${s.review_banner === '1' ? '<div class="review">Versión de revisión. Los pagos en línea aún no están habilitados: los pedidos se confirman por WhatsApp o teléfono.</div>' : ''}
@@ -156,30 +157,82 @@ export function servicePage(s, v, others) {
   <section class="wrap block"><h2 class="h3">Otros servicios</h2><ul class="chips">${others.map((o) => `<li><a href="/servicios/${h(o.slug)}">${h(o.title)}</a></li>`).join('')}</ul></section>`;
 }
 
-export function shopPage(s, { co, categories, products, q, c }) {
-  return `<section class="shop-head"><div class="wrap shop-head-in">
-  <div><img src="${h(co.logo_dark)}" alt="Gregorian" width="180" height="120" class="ph-logo-wide"><h1>Tienda de equipos de protección</h1>
-  <p class="lead">${h(co.description)}</p></div>
-  <form class="search" role="search" action="/tienda"><label class="sr" for="q">Buscar producto</label>
-    <input id="q" name="q" value="${h(q)}" placeholder="Buscar: casco, guantes, chaleco…">${c ? `<input type="hidden" name="c" value="${h(c)}">` : ''}<button class="btn gold">Buscar</button></form></div></section>
-  <section class="wrap block">
-  <nav class="chips" aria-label="Categorías"><a href="/tienda${q ? `?q=${encodeURIComponent(q)}` : ''}" ${!c ? 'aria-current="true"' : ''}>Todo</a>${categories.map((k) => `<a href="/tienda?c=${h(k.slug)}${q ? `&q=${encodeURIComponent(q)}` : ''}" ${c === k.slug ? 'aria-current="true"' : ''}>${h(k.name)}</a>`).join('')}</nav>
-  <p class="note">Precios referenciales en soles. Confirmamos stock, tallas y entrega antes de cualquier pago.</p>
-  ${products.length ? `<div class="grid-prod">${products.map(productCard).join('')}</div>`
-    : `<div class="empty"><p>No encontramos productos para “${h(q)}”.</p><a class="btn ghost" href="/tienda">Ver todo el catálogo</a> <a class="btn wa" href="${wa(s.whatsapp, `Hola, busco: ${q}`)}" target="_blank" rel="noopener">${ICON.wa}Preguntar por WhatsApp</a></div>`}
+// ---------- Tienda ----------
+const ART = JSON.parse(fs.readFileSync(new URL('./product-art.json', import.meta.url), 'utf8'));
+// Imagen recortada y color de marca de cada producto; si el admin sube otra foto se usa tal cual.
+export const art = (p) => ART[p.image] || { cut: p.image, tone: '#1a5f99', photo: true };
+// Texto oscuro sobre los tonos claros (arena y dorado), blanco sobre los demás.
+const on = (tone) => (/^#(e8dcc0|c9a24a)$/i.test(tone) ? '#14202c' : '#ffffff');
+const vt = (p) => `view-transition-name:p-${h(p.slug).replace(/[^a-z0-9-]/gi, '')}`;
+const firstLine = (t) => lines(t)[0] || '';
+const SI = {
+  arrow: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
+  minus: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>',
+  check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>',
+  search: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>',
+  back: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>',
+};
+const addData = (p) => h(JSON.stringify({ slug: p.slug, name: p.name, price: p.price_cents, image: p.image }));
+const figure = (p, cls = '', eager = false) => {
+  const a = art(p);
+  return `<span class="sp-fig ${a.photo ? 'is-photo' : 'is-cut'} ${cls}"><img src="${h(a.cut)}" alt="${h(p.name)}" ${a.w ? `width="${a.w}" height="${a.h}"` : ''} ${eager ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async"></span>`;
+};
+
+function shopCard(p, i = 0) {
+  const a = art(p);
+  return `<article class="sc" style="--tone:${a.tone};--on:${on(a.tone)};--i:${i % 8}" data-cat="${h(p.cslug || '')}" data-text="${h((p.name + ' ' + p.category + ' ' + p.description).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''))}">
+  <a class="sc-tile" href="/tienda/${h(p.slug)}" style="${vt(p)}" tabindex="-1" aria-hidden="true"><i class="sc-blob"></i>${figure(p)}</a>
+  <div class="sc-body"><small>${h(p.category || '')}</small><h3><a href="/tienda/${h(p.slug)}">${h(p.name)}</a></h3>
+  <div class="sc-row"><p class="sc-price">${money(p.price_cents)}${p.availability !== 'disponible' ? ` <span class="avail">${h(p.availability)}</span>` : ''}</p>
+  ${p.availability === 'agotado' ? '' : `<button class="sc-add" type="button" data-add="${addData(p)}" aria-label="Agregar ${h(p.name)} al pedido">${SI.plus}</button>`}
+  <a class="sc-go" href="/tienda/${h(p.slug)}" aria-label="Ver ${h(p.name)}">${SI.arrow}</a></div></div></article>`;
+}
+
+export function shopPage(s, { co, categories, products, all: everything, q, c }) {
+  const featured = everything.filter((p) => p.price_cents != null && !art(p).photo).slice(0, 8);
+  const pick = ['guantes-de-badana', 'poncho-impermeable', 'chaleco-rojo'].map((sl) => everything.find((p) => p.slug === sl)).filter(Boolean);
+  const hero = (pick.length === 3 ? pick : featured.slice(0, 3));
+  const count = (slug) => everything.filter((p) => p.cslug === slug).length;
+  const full = !q && !c;
+  return `<section class="sh"><div class="sh-mark" aria-hidden="true"><span>GREGORIAN · SEGURIDAD EN INGENIERÍA · GREGORIAN · SEGURIDAD EN INGENIERÍA · </span><span>GREGORIAN · SEGURIDAD EN INGENIERÍA · GREGORIAN · SEGURIDAD EN INGENIERÍA · </span></div>
+  <div class="wrap sh-in"><div class="sh-copy"><img src="${h(co.logo_dark)}" alt="Gregorian" width="150" height="100" class="sh-logo">
+  <h1><span>Equipos que</span> <em>te cuidan</em> <span>en la obra</span></h1>
+  <p>${h(co.description)}</p>
+  <form class="sh-search" role="search" action="/tienda" data-search><label class="sr" for="q">Buscar producto</label>${SI.search}
+    <input id="q" name="q" value="${h(q)}" placeholder="Busca casco, guantes, chaleco…" autocomplete="off">${c ? `<input type="hidden" name="c" value="${h(c)}">` : ''}<button class="btn gold">Buscar</button></form></div>
+  <div class="sh-art" aria-hidden="true"><i class="sh-orbit"></i><i class="sh-sun"></i>${hero.map((p, i) => `<a href="/tienda/${h(p.slug)}" tabindex="-1" class="sh-p sh-p${i}" style="--tone:${art(p).tone}">${figure(p, '', true)}<span class="sh-tag">${h(p.name)}<b>${money(p.price_cents)}</b></span></a>`).join('')}</div></div></section>
+  ${full && featured.length ? `<section class="sf" aria-label="Destacados"><div class="wrap sf-head"><h2>Lo más pedido</h2><div class="sf-nav"><button type="button" data-rail="-1" aria-label="Anterior">${SI.back}</button><button type="button" data-rail="1" aria-label="Siguiente">${SI.arrow}</button></div></div>
+  <div class="sf-rail" data-rail-track tabindex="0">${featured.map((p, i) => { const a = art(p); return `<a class="sf-card" href="/tienda/${h(p.slug)}" style="--tone:${a.tone};--on:${on(a.tone)};--i:${i}"><span class="sf-txt"><b>${h(p.name)}</b><span>${money(p.price_cents)}</span><small>${h(p.category || '')}</small></span><i class="sf-ring"></i>${figure(p, '', i < 2)}<span class="sf-go">${SI.arrow}</span></a>`; }).join('')}</div>
+  <div class="sf-dots" data-rail-dots aria-hidden="true">${featured.map(() => '<i></i>').join('')}</div></section>` : ''}
+  <section class="wrap ss" ${full ? 'data-filter' : ''}>
+  <nav class="st" aria-label="Categorías"><a href="/tienda${q ? `?q=${encodeURIComponent(q)}` : ''}" data-cat="" ${!c ? 'aria-current="true"' : ''}>Todo<small>${everything.length}</small></a>${categories.map((k) => `<a href="/tienda?c=${h(k.slug)}${q ? `&q=${encodeURIComponent(q)}` : ''}" data-cat="${h(k.slug)}" ${c === k.slug ? 'aria-current="true"' : ''}>${h(k.name)}<small>${count(k.slug)}</small></a>`).join('')}<span class="st-bar" aria-hidden="true"></span></nav>
+  <p class="ss-note"><b data-shown>${products.length}</b> productos · Precios referenciales en soles. Confirmamos stock, tallas y entrega antes de cualquier pago.</p>
+  <div class="sg" data-grid>${products.map(shopCard).join('')}</div>
+  <div class="empty" data-empty ${products.length ? 'hidden' : ''}><p>No encontramos productos${q ? ` para “${h(q)}”` : ''}.</p><a class="btn ghost" href="/tienda">Ver todo el catálogo</a> <a class="btn wa" href="${wa(s.whatsapp, `Hola, busco: ${q || 'un equipo de protección'}`)}" target="_blank" rel="noopener">${ICON.wa}Preguntar por WhatsApp</a></div>
   </section>`;
 }
 
 export function productPage(s, p, related) {
-  return `<article class="wrap detail"><nav class="crumbs"><a href="/tienda">Tienda</a> / ${h(p.category || '')}</nav>
-  <div class="detail-grid prod-detail"><figure class="frame sq"><img src="${h(p.image)}" alt="${h(p.name)}" fetchpriority="high"></figure>
-  <div><h1>${h(p.name)}</h1><p class="price big">${money(p.price_cents)}</p><p class="avail-line">Disponibilidad: <b>${h(p.availability)}</b></p>
-  <p>${h(p.description)}</p>${p.variants ? `<p>Opciones: ${h(p.variants)}</p>` : ''}
-  ${p.availability === 'agotado' ? '' : `<div class="buy"><label>Cantidad<input type="number" min="1" max="999" value="1" data-qty></label>
-  <button class="btn gold" data-add='${h(JSON.stringify({ slug: p.slug, name: p.name, price: p.price_cents, image: p.image }))}'>Agregar al pedido</button></div>`}
-  <a class="btn wa ghost" href="${wa(s.whatsapp, `Hola, me interesa: ${p.name} (${money(p.price_cents)}).`)}" target="_blank" rel="noopener">${ICON.wa}Consultar por WhatsApp</a>
-  <p class="note">Sin cargos ocultos: el costo de envío, si aplica, te lo confirmamos antes de pagar.</p></div></div></article>
-  ${related.length ? `<section class="wrap block"><h2 class="h3">También en ${h(p.category || 'la tienda')}</h2><div class="grid-prod">${related.map(productCard).join('')}</div></section>` : ''}`;
+  const a = art(p), [lead, ...feats] = lines(p.description);
+  const variants = String(p.variants || '').split(',').map((v) => v.trim()).filter(Boolean);
+  return `<article class="pd" style="--tone:${a.tone};--on:${on(a.tone)}">
+  <div class="wrap pd-in">
+  <div class="pd-stage"><a class="pd-back" href="/tienda" aria-label="Volver a la tienda">${SI.back}</a>
+    <span class="pd-word" aria-hidden="true">${h((p.category || 'Gregorian').toUpperCase())}</span><i class="pd-blob" aria-hidden="true"></i>
+    <div class="pd-shot" style="${vt(p)}" data-shot>${figure(p, '', true)}</div>
+    <div class="pd-thumbs" role="group" aria-label="Imágenes"><button type="button" aria-pressed="true" data-src="${h(a.cut)}" data-photo="${a.photo ? 1 : 0}"><img src="${h(a.cut)}" alt="" loading="lazy"><span class="sr">Producto</span></button>${a.cut !== p.image ? `<button type="button" aria-pressed="false" data-src="${h(p.image)}" data-photo="1"><img src="${h(p.image)}" alt="" loading="lazy"><span class="sr">Volante original</span></button>` : ''}</div></div>
+  <div class="pd-info"><nav class="crumbs"><a href="/tienda">Tienda</a> / <a href="/tienda?c=${h(p.cslug || '')}">${h(p.category || '')}</a></nav>
+    <h1>${h(p.name)}</h1>
+    <div class="pd-price"><b>${money(p.price_cents)}</b><span class="pd-av ${h(p.availability)}"><i></i>${p.availability === 'disponible' ? 'Disponible' : h(p.availability)}</span></div>
+    <p class="pd-lead">${h(lead || '')}</p>
+    ${feats.length ? `<ul class="pd-feats">${feats.map((f, i) => `<li style="--i:${i}">${SI.check}${h(f)}</li>`).join('')}</ul>` : ''}
+    ${variants.length ? `<div class="pd-var"><span>Opciones</span><div>${variants.map((v) => `<b>${h(v)}</b>`).join('')}</div><small>Escribe la opción que necesitas en las notas del pedido.</small></div>` : ''}
+    ${p.availability === 'agotado' ? '' : `<div class="buy pd-buy"><div class="pd-qty"><button type="button" data-step="-1" aria-label="Quitar uno">${SI.minus}</button><label class="sr" for="qty">Cantidad</label><input id="qty" type="number" min="1" max="999" value="1" data-qty inputmode="numeric"><button type="button" data-step="1" aria-label="Agregar uno">${SI.plus}</button></div>
+    <button class="pd-swipe" type="button" data-add="${addData(p)}" data-swipe><span class="pd-knob">${ICON.cart}</span><span class="pd-label">Desliza o toca para agregar</span><span class="pd-chev" aria-hidden="true">›››</span></button></div>`}
+    <a class="btn wa ghost pd-wa" href="${wa(s.whatsapp, `Hola, me interesa: ${p.name} (${money(p.price_cents)}).`)}" target="_blank" rel="noopener">${ICON.wa}Consultar por WhatsApp</a>
+    <p class="note">Sin cargos ocultos: el costo de envío, si aplica, te lo confirmamos antes de pagar.</p></div></div></article>
+  ${related.length ? `<section class="wrap ss pd-rel"><h2 class="h3">También en ${h(p.category || 'la tienda')}</h2><div class="sg">${related.map(shopCard).join('')}</div></section>` : ''}`;
 }
 
 export function cartPage(s, catalog) {

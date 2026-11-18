@@ -54,15 +54,15 @@ app.get('/servicios/:slug', (req, res, next) => {
 app.get('/tienda', (req, res) => {
   const q = String(req.query.q || '').trim().slice(0, 60); const c = String(req.query.c || '');
   const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-  const products = visibleProducts().filter((p) => (!c || p.cslug === c) && (!q || norm(p.name + ' ' + p.description + ' ' + p.category).includes(norm(q))));
+  const everything = visibleProducts(); const products = everything.filter((p) => (!c || p.cslug === c) && (!q || norm(p.name + ' ' + p.description + ' ' + p.category).includes(norm(q))));
   page(res, { title: 'Tienda de equipos de protección', path: '/tienda', theme: 'shop', desc: 'Zapatos de seguridad, cascos, guantes, chalecos y ropa de trabajo. Precios en soles.',
-    body: V.shopPage(settings(), { co: companies()[1], categories: all('SELECT * FROM categories ORDER BY sort'), products, q, c }) });
+    body: V.shopPage(settings(), { co: companies()[1], categories: all('SELECT * FROM categories ORDER BY sort'), products, all: everything, q, c }) });
 });
 app.get('/tienda/:slug', (req, res, next) => {
   const p = visibleProducts().find((x) => x.slug === req.params.slug);
   if (!p) return next();
   page(res, { title: p.name, desc: p.description, path: '/tienda', theme: 'shop',
-    body: V.productPage(settings(), p, visibleProducts().filter((x) => x.category_id === p.category_id && x.id !== p.id).slice(0, 4)) });
+    body: V.productPage(settings(), p, visibleProducts().filter((x) => x.category_id === p.category_id && x.id !== p.id).slice(0, 4).concat(visibleProducts().filter((x) => x.category_id !== p.category_id)).slice(0, 4)) });
 });
 app.get('/carrito', (req, res) => page(res, { title: 'Tu pedido', path: '/carrito', theme: 'shop',
   body: V.cartPage(settings(), visibleProducts().map(({ slug, name, price_cents, image, availability }) => ({ slug, name, price: price_cents, image, availability }))) }));

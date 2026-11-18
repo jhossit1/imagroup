@@ -1,0 +1,107 @@
+{
+ "/img/p/botas.webp": {
+  "cut": "/img/p/c/botas.webp",
+  "tone": "#1a5f99",
+  "photo": true,
+  "w": 666,
+  "h": 505
+ },
+ "/img/p/camisa-outdoor.webp": {
+  "cut": "/img/p/c/camisa-outdoor.webp",
+  "tone": "#c9a24a",
+  "photo": false,
+  "w": 623,
+  "h": 437
+ },
+ "/img/p/casco.webp": {
+  "cut": "/img/p/c/casco.webp",
+  "tone": "#14324f",
+  "photo": true,
+  "w": 441,
+  "h": 585
+ },
+ "/img/p/chaleco-multibolsillo.webp": {
+  "cut": "/img/p/c/chaleco-multibolsillo.webp",
+  "tone": "#c9a24a",
+  "photo": true,
+  "w": 423,
+  "h": 659
+ },
+ "/img/p/chaleco-rojo.webp": {
+  "cut": "/img/p/c/chaleco-rojo.webp",
+  "tone": "#2f86cc",
+  "photo": false,
+  "w": 732,
+  "h": 418
+ },
+ "/img/p/guantes.webp": {
+  "cut": "/img/p/c/guantes.webp",
+  "tone": "#1a5f99",
+  "photo": false,
+  "w": 643,
+  "h": 382
+ },
+ "/img/p/juego-seguridad.webp": {
+  "cut": "/img/p/c/juego-seguridad.webp",
+  "tone": "#2f86cc",
+  "photo": false,
+  "w": 558,
+  "h": 430
+ },
+ "/img/p/pantalon.webp": {
+  "cut": "/img/p/c/pantalon.webp",
+  "tone": "#3d8a37",
+  "photo": false,
+  "w": 355,
+  "h": 699
+ },
+ "/img/p/polo-lurawi.webp": {
+  "cut": "/img/p/c/polo-lurawi.webp",
+  "tone": "#c9a24a",
+  "photo": false,
+  "w": 360,
+  "h": 760
+ },
+ "/img/p/polo-ml-deporte.webp": {
+  "cut": "/img/p/c/polo-ml-deporte.webp",
+  "tone": "#14324f",
+  "photo": true,
+  "w": 760,
+  "h": 498
+ },
+ "/img/p/polo-ml.webp": {
+  "cut": "/img/p/c/polo-ml.webp",
+  "tone": "#3d8a37",
+  "photo": true,
+  "w": 760,
+  "h": 460
+ },
+ "/img/p/poncho.webp": {
+  "cut": "/img/p/c/poncho.webp",
+  "tone": "#1a5f99",
+  "photo": false,
+  "w": 587,
+  "h": 509
+ },
+ "/img/p/respirador.webp": {
+  "cut": "/img/p/c/respirador.webp",
+  "tone": "#3d8a37",
+  "photo": true,
+  "w": 430,
+  "h": 760
+ },
+ "/img/p/silbato.webp": {
+  "cut": "/img/p/c/silbato.webp",
+  "tone": "#1a5f99",
+  "photo": true,
+  "w": 760,
+  "h": 497
+ },
+ "/img/p/zapatos.webp": {
+  "cut": "/img/p/c/zapatos.webp",
+  "tone": "#14324f",
+  "photo": true,
+  "w": 495,
+  "h": 684
+ }
+}
