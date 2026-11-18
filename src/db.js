@@ -31,6 +31,25 @@ const MIGRATIONS = [
    CREATE TABLE pageviews (day TEXT, path TEXT, count INTEGER DEFAULT 0, PRIMARY KEY (day, path));
    CREATE TABLE audit (id INTEGER PRIMARY KEY, admin TEXT, action TEXT, entity TEXT, entity_id INTEGER, detail TEXT,
      at TEXT DEFAULT (datetime('now')));`,
+  // v0.2: trabajadores (solo administrador), evaluaciones con reconocimiento y certificados verificables.
+  `CREATE TABLE workers (id INTEGER PRIMARY KEY, name TEXT NOT NULL, phone TEXT, trade TEXT, zone TEXT,
+     company_id INTEGER REFERENCES companies(id) DEFAULT 1, joined TEXT, status TEXT DEFAULT 'activo', notes TEXT,
+     created_at TEXT DEFAULT (datetime('now')));
+   CREATE TABLE evaluations (id INTEGER PRIMARY KEY, worker_id INTEGER NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
+     period TEXT NOT NULL, project TEXT, days INTEGER, s_seg INTEGER, s_cal INTEGER, s_prod INTEGER, s_pun INTEGER,
+     s_equ INTEGER, s_ord INTEGER, score REAL, level TEXT, bonus_cents INTEGER, status TEXT DEFAULT 'propuesto',
+     reason TEXT, evaluator TEXT, decided_by TEXT, decided_at TEXT, revoke_reason TEXT, created_at TEXT DEFAULT (datetime('now')),
+     UNIQUE (worker_id, period));
+   CREATE TABLE certificates (id INTEGER PRIMARY KEY, code TEXT UNIQUE NOT NULL, worker_id INTEGER NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
+     evaluation_id INTEGER REFERENCES evaluations(id) ON DELETE SET NULL, kind TEXT, title TEXT, body TEXT, company_id INTEGER,
+     issued_by TEXT, issued_at TEXT DEFAULT (datetime('now')), revoked_at TEXT, revoked_reason TEXT);
+   ALTER TABLE companies ADD COLUMN signer_name TEXT;
+   ALTER TABLE companies ADD COLUMN signer_role TEXT DEFAULT 'Gerencia General';
+   ALTER TABLE companies ADD COLUMN signature TEXT;
+   ALTER TABLE companies ADD COLUMN signer2_name TEXT DEFAULT 'Ing. Jhossi Gregory Tenorio Montenegro';
+   ALTER TABLE companies ADD COLUMN signer2_role TEXT DEFAULT 'Ingeniero responsable · CIP 285140';
+   ALTER TABLE companies ADD COLUMN signature2 TEXT;
+   INSERT OR IGNORE INTO settings (key, value) VALUES ('bono_oro', '300'), ('bono_plata', '200'), ('bono_bronce', '100');`,
 ];
 
 db.exec('CREATE TABLE IF NOT EXISTS _migrations (n INTEGER PRIMARY KEY)');

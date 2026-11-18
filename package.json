@@ -4,7 +4,9 @@
   "private": true,
   "description": "Web y sistema de administración de Imagroup S.A.C. y Gregorian",
   "type": "module",
-  "engines": { "node": ">=24" },
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning src/server.js",
     "dev": "node --watch --disable-warning=ExperimentalWarning src/server.js",
@@ -13,6 +15,7 @@
   "dependencies": {
     "express": "^5.1.0",
     "multer": "^2.0.2",
-    "pdfkit": "^0.17.2"
+    "pdfkit": "^0.17.2",
+    "qrcode": "1.5.4"
   }
 }

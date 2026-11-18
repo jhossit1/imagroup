@@ -124,9 +124,9 @@ h2 { font-size: 1.02rem; margin: 0 0 12px; } h3 { font-size: 1rem; margin: 18px 
 .d-feed b { display: block; font-size: .88rem; font-weight: 600; } .d-feed small { color: var(--mut); font-size: .76rem; } .d-feed .a-pill { margin-left: auto; }
 .d-ico { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; flex: none; color: var(--ac); background: color-mix(in srgb, var(--ac) 12%, transparent); }
 .d-ico .ic { width: 17px; height: 17px; }
-.a-create, .k-pedido { color: var(--ok); background: color-mix(in srgb, var(--ok) 13%, transparent); }
-.a-delete { color: var(--bad); background: color-mix(in srgb, var(--bad) 12%, transparent); }
-.a-update, .a-export { color: var(--pink); background: color-mix(in srgb, var(--pink) 12%, transparent); }
+.t-create, .t-approve, .t-certificate, .k-pedido { color: var(--ok); background: color-mix(in srgb, var(--ok) 13%, transparent); }
+.t-delete, .t-revoke { color: var(--bad); background: color-mix(in srgb, var(--bad) 12%, transparent); }
+.t-update, .t-export, .t-evaluate { color: var(--pink); background: color-mix(in srgb, var(--pink) 12%, transparent); }
 .d-empty { margin: 0; padding: 16px; border-radius: 12px; border: 1.5px dashed var(--ln); color: var(--mut); font-size: .88rem; text-align: center; }
 
 /* ---- Componentes de las demás páginas ---- */

@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import { all, get, run, settings, audit, DATA_DIR } from './db.js';
 import { checkPassword, hashPassword, passwordProblem, createSession, destroySession, requireAdmin, limited, sha } from './auth.js';
 import { h, money } from './views.js';
+import { mountWorkers, monthStar } from './workers.js';
 
 const r = express.Router();
 const upload = multer({
@@ -37,14 +38,18 @@ const ENT = {
     { name: 'gallery', label: 'Galería (una ruta de imagen por línea)', type: 'textarea' }, { name: 'sort', label: 'Orden', type: 'number' }, { name: 'visible', label: 'Publicado', type: 'bool' }] },
   companies: { label: 'Empresas', one: 'empresa', title: 'name', cols: ['name', 'tagline'], noCreate: 1, fields: [
     { name: 'name', label: 'Nombre comercial', req: 1 }, { name: 'tagline', label: 'Lema' }, { name: 'description', label: 'Descripción', type: 'textarea' },
-    { name: 'scope', label: 'Ámbitos (uno por línea)', type: 'textarea' }, { name: 'logo', label: 'Logo (fondo claro)', type: 'image' }, { name: 'logo_dark', label: 'Logo (fondo oscuro)', type: 'image' }] },
+    { name: 'scope', label: 'Ámbitos (uno por línea)', type: 'textarea' }, { name: 'logo', label: 'Logo (fondo claro)', type: 'image' }, { name: 'logo_dark', label: 'Logo (fondo oscuro)', type: 'image' },
+    { name: 'signer_name', label: 'Certificados: firmante 1, nombre', help: 'Ejemplo: nombre del gerente general.' }, { name: 'signer_role', label: 'Certificados: firmante 1, cargo' },
+    { name: 'signature', label: 'Certificados: firma 1 (PNG con fondo transparente)', type: 'image' },
+    { name: 'signer2_name', label: 'Certificados: firmante 2, nombre' }, { name: 'signer2_role', label: 'Certificados: firmante 2, cargo' },
+    { name: 'signature2', label: 'Certificados: firma 2 (PNG con fondo transparente)', type: 'image' }] },
 };
 const SETTINGS = [
   ['phone_1', 'Teléfono principal (WhatsApp)'], ['phone_2', 'Teléfono secundario'], ['whatsapp', 'Número de WhatsApp con código de país (ej. 51943300006)'],
   ['email', 'Correo de contacto'], ['city', 'Ciudad'], ['facebook', 'Enlace de Facebook'],
   ['notify_webhook', 'Aviso de nuevas solicitudes: URL https de webhook (opcional)'],
   ['owner_name', 'Portafolio: nombre del profesional (vacío = no se muestra el perfil)'], ['owner_role', 'Portafolio: cargo'], ['owner_bio', 'Portafolio: trayectoria (un párrafo por línea)'],
-  ['owner_photo', 'Portafolio: foto (ruta)'], ['review_banner', 'Mostrar aviso de versión de revisión (1 = sí, 0 = no)'],
+  ['owner_photo', 'Portafolio: foto (ruta)'], ['bono_oro', 'Trabajadores: bono nivel Oro (S/)'], ['bono_plata', 'Trabajadores: bono nivel Plata (S/)'], ['bono_bronce', 'Trabajadores: bono nivel Bronce (S/)'], ['review_banner', 'Mostrar aviso de versión de revisión (1 = sí, 0 = no)'],
 ];
 const LEAD_STATES = ['nuevo', 'en proceso', 'cotizado', 'confirmado', 'entregado', 'cerrado', 'descartado'];
 
@@ -65,18 +70,21 @@ const IC = {
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.4 1.4M17.6 17.6 19 19M5 19l1.4-1.4M17.6 6.4 19 5"/>',
   moon: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
   down: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
+  users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c2 .7 3.2 2.4 3.5 5.2"/>',
+  star: '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>',
+  coin: '<circle cx="12" cy="12" r="9"/><path d="M14.8 9.2c-.5-.9-1.6-1.4-2.8-1.4-1.6 0-2.8.8-2.8 2.1 0 3 5.8 1.4 5.8 4.3 0 1.3-1.3 2.1-3 2.1-1.3 0-2.5-.6-3-1.6M12 6v1.8M12 16.3V18"/>',
   plus: '<path d="M12 5v14M5 12h14"/>', pen: '<path d="M4 20h4L19 9l-4-4L4 16z"/>', x: '<path d="M6 6l12 12M18 6 6 18"/>', in: '<path d="M10 4H5v16h5M14 8l4 4-4 4M18 12H8"/>',
 };
 const ic = (n) => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${IC[n]}</svg>`;
-const NAV = [['/admin', 'Inicio', 'home'], ['/admin/leads', 'Solicitudes', 'inbox'], ['/admin/products', 'Productos', 'box'], ['/admin/categories', 'Categorías', 'tag'],
+const NAV = [['/admin', 'Inicio', 'home'], ['/admin/leads', 'Solicitudes', 'inbox'], ['/admin/trabajadores', 'Trabajadores', 'users'], ['/admin/products', 'Productos', 'box'], ['/admin/categories', 'Categorías', 'tag'],
   ['/admin/services', 'Servicios', 'leaf'], ['/admin/projects', 'Portafolio', 'folder'], ['/admin/companies', 'Empresas', 'building'], ['/admin/ajustes', 'Ajustes', 'gear'], ['/admin/auditoria', 'Auditoría', 'shield']];
-const TABS = ['/admin', '/admin/leads', '/admin/products', '/admin/services'];
+const TABS = ['/admin', '/admin/leads', '/admin/trabajadores', '/admin/products'];
 
 const shell = (req, title, body) => {
   const head = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex"><meta name="color-scheme" content="light dark"><title>${h(title)} · Admin Imagroup</title><link rel="icon" href="/img/brand/imagroup.webp">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/admin.css?v=3"><script src="/js/theme.js?v=7"></script><script src="/js/admin.js?v=3" defer></script></head>`;
+<link rel="stylesheet" href="/css/admin.css?v=4"><link rel="stylesheet" href="/css/admin-team.css?v=2"><script src="/js/theme.js?v=7"></script><script src="/js/admin.js?v=4" defer></script></head>`;
   const themeBtn = `<button type="button" class="ad-icon ad-theme" data-theme-btn aria-label="Cambiar entre modo claro y oscuro">${ic('sun')}${ic('moon')}</button>`;
   if (!req.admin) return `${head}<body class="ad-guest"><div class="ad-orbs" aria-hidden="true"><i></i><i></i><i></i></div>${themeBtn}<main class="ad-guest-main">${body}</main></body></html>`;
   const cur = req.originalUrl.split('?')[0].replace(/\/$/, '') || '/admin';
@@ -139,6 +147,7 @@ r.post('/setup', (req, res) => {
 r.post('/:ent/:id', (req, res, next) => (req.admin && ENT[req.params.ent] ? upload.any()(req, res, next) : next()));
 r.use(requireAdmin);
 r.post('/logout', (req, res) => { destroySession(req, res); res.redirect('/admin/login'); });
+mountWorkers(r, { shell: (...a) => shell(...a), ic: (n) => ic(n), csrf: (q) => csrf(q) });
 
 // ---- Inicio del panel ----
 r.get('/', (req, res) => {
@@ -167,8 +176,8 @@ r.get('/', (req, res) => {
   const tmax = Math.max(1, ...top.map((t) => t.n));
   const pct = prods ? Math.round((pub / prods) * 100) : 0;
   const today = new Intl.DateTimeFormat('es-PE', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Lima' }).format(new Date());
-  const ACT = { login: ['in', 'Ingresó al panel'], create: ['plus', 'Creó'], update: ['pen', 'Editó'], delete: ['x', 'Eliminó'], export: ['down', 'Exportó'], password_set: ['shield', 'Definió su contraseña'] };
-  const ENTN = { products: 'un producto', categories: 'una categoría', services: 'un servicio', projects: 'un proyecto', companies: 'una empresa', settings: 'los ajustes', leads: 'solicitudes' };
+  const ACT = { login: ['in', 'Ingresó al panel'], create: ['plus', 'Creó'], update: ['pen', 'Editó'], delete: ['x', 'Eliminó'], export: ['down', 'Exportó'], password_set: ['shield', 'Definió su contraseña'], evaluate: ['star', 'Evaluó a'], approve: ['star', 'Aprobó reconocimiento de'], revoke: ['x', 'Revocó'], certificate: ['shield', 'Emitió certificado a'] };
+  const ENTN = { products: 'un producto', categories: 'una categoría', services: 'un servicio', projects: 'un proyecto', companies: 'una empresa', settings: 'los ajustes', leads: 'solicitudes', workers: 'un trabajador', certificates: 'un certificado' };
   const count = (n, suf = '') => `<b data-count="${n}" data-suf="${suf}">${n}${suf}</b>`;
 
   res.send(shell(req, 'Inicio', `<div class="dash">
@@ -199,11 +208,12 @@ r.get('/', (req, res) => {
     <div class="d-me"><span class="ad-user big">${h(req.admin.username.slice(0, 1).toUpperCase())}</span><div><b>${h(req.admin.username)}</b><small>Administrador</small></div></div>
     <div class="d-kpi"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><path d="${line}" pathLength="1"/></svg>
       ${delta == null ? '' : `<span class="d-delta${delta < 0 ? ' neg' : ''}">${delta > 0 ? '+' : ''}${delta}%</span>`}<small>Visitas en 30 días</small>${count(v30)}</div>
+    ${monthStar()}
     <h2>Últimas solicitudes</h2>
     ${leads.length ? `<ul class="d-feed">${leads.map((l, i) => `<li style="--i:${i}"><a href="/admin/leads/${l.id}"><span class="d-ico k-${h(l.kind)}">${ic(l.kind === 'pedido' ? 'box' : 'inbox')}</span><span><b>${h(l.name || l.email)}</b><small>${h(l.kind)} · ${h(l.created_at.slice(5, 16))}</small></span><span class="a-pill s-${h(l.status.replace(' ', '-'))}">${h(l.status)}</span></a></li>`).join('')}</ul>`
       : '<p class="d-empty">Aún no hay solicitudes. Llegarán aquí desde el formulario de contacto y el carrito.</p>'}
     <h2>Actividad del equipo</h2>
-    <ul class="d-feed">${acts.map((a, i) => { const [icon, verb] = ACT[a.action] || ['pen', a.action]; return `<li style="--i:${i + 3}"><span class="d-ico a-${h(a.action)}">${ic(icon)}</span><span><b>${h(verb)} ${a.action === 'login' || a.action === 'password_set' ? '' : h(ENTN[a.entity] || a.entity || '')}</b><small>${h(a.admin)} · ${h(String(a.at).slice(5, 16))}</small></span></li>`; }).join('')}</ul>
+    <ul class="d-feed">${acts.map((a, i) => { const [icon, verb] = ACT[a.action] || ['pen', a.action]; return `<li style="--i:${i + 3}"><span class="d-ico t-${h(a.action)}">${ic(icon)}</span><span><b>${h(verb)} ${a.action === 'login' || a.action === 'password_set' ? '' : h(ENTN[a.entity] || a.entity || '')}</b><small>${h(a.admin)} · ${h(String(a.at).slice(5, 16))}</small></span></li>`; }).join('')}</ul>
   </aside>
 </div>`));
 });

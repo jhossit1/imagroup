@@ -4,6 +4,7 @@ import { all, get, run, settings, DATA_DIR } from './db.js';
 import { loadSession, limited } from './auth.js';
 import * as V from './views.js';
 import admin from './admin.js';
+import { verifyData } from './workers.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -72,6 +73,17 @@ app.get('/portafolio/:slug', (req, res, next) => {
   const p = get('SELECT * FROM projects WHERE slug = ? AND visible = 1', req.params.slug);
   if (!p) return next();
   page(res, { title: p.title, desc: p.summary, path: '/portafolio', body: V.projectPage(settings(), p) });
+});
+// Verificación de certificados por QR: solo datos autorizados, nunca la ficha laboral.
+app.get('/verificar/:code', (req, res) => {
+  const c = verifyData(String(req.params.code).slice(0, 20)), ok = c && !c.revoked_at;
+  res.status(c ? 200 : 404).set('X-Robots-Tag', 'noindex');
+  page(res, { title: 'Verificación de certificado', path: '/verificar', body: `<section class="vf"><div class="wrap"><div class="vf-card ${ok ? 'ok' : 'bad'}">
+    <span class="vf-ico" aria-hidden="true">${ok ? '✓' : '!'}</span><p class="eyebrow">Verificación de certificado</p>
+    <h1>${c ? (ok ? 'Certificado válido' : 'Certificado anulado') : 'Código no encontrado'}</h1>
+    ${c ? `<dl><dt>Otorgado a</dt><dd>${V.h(c.name)}</dd><dt>Reconocimiento</dt><dd>${V.h(c.title)}</dd><dt>Empresa</dt><dd>${V.h(c.company || '')}</dd>
+    ${c.period ? `<dt>Periodo</dt><dd>${V.h(c.period)}</dd>` : ''}<dt>Emitido</dt><dd>${V.h(c.issued_at.slice(0, 10))}</dd><dt>Código</dt><dd>${V.h(c.code)}</dd></dl>`
+    : '<p>Revisa que el código esté bien escrito. Si el problema sigue, contáctanos.</p>'}</div></div></section>` });
 });
 app.get('/contacto', (req, res) => page(res, { title: 'Contacto', path: '/contacto', body: V.contactPage(settings(), String(req.query.asunto || '').slice(0, 140)) }));
 
