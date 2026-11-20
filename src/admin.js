@@ -6,6 +6,7 @@ import { all, get, run, settings, audit, DATA_DIR } from './db.js';
 import { checkPassword, hashPassword, passwordProblem, createSession, destroySession, requireAdmin, limited, sha } from './auth.js';
 import { h, money } from './views.js';
 import { mountWorkers, monthStar } from './workers.js';
+import { mountBuilder, mountBuilderAdmin } from './builder.js';
 
 const r = express.Router();
 const upload = multer({
@@ -56,6 +57,7 @@ const LEAD_STATES = ['nuevo', 'en proceso', 'cotizado', 'confirmado', 'entregado
 // Íconos de trazo (24×24) para la navegación del panel.
 const IC = {
   home: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+  layout: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 9v12"/>',
   inbox: '<path d="M4 4h16v16H4z"/><path d="M4 14h4l2 3h4l2-3h4"/>',
   box: '<path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7M12 11v10"/>',
   tag: '<path d="M3 12V3h9l9 9-9 9z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
@@ -76,7 +78,7 @@ const IC = {
   plus: '<path d="M12 5v14M5 12h14"/>', pen: '<path d="M4 20h4L19 9l-4-4L4 16z"/>', x: '<path d="M6 6l12 12M18 6 6 18"/>', in: '<path d="M10 4H5v16h5M14 8l4 4-4 4M18 12H8"/>',
 };
 const ic = (n) => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${IC[n]}</svg>`;
-const NAV = [['/admin', 'Inicio', 'home'], ['/admin/leads', 'Solicitudes', 'inbox'], ['/admin/trabajadores', 'Trabajadores', 'users'], ['/admin/products', 'Productos', 'box'], ['/admin/categories', 'Categorías', 'tag'],
+const NAV = [['/admin', 'Inicio', 'home'], ['/admin/paginas', 'Diseño web', 'layout'], ['/admin/leads', 'Solicitudes', 'inbox'], ['/admin/trabajadores', 'Trabajadores', 'users'], ['/admin/products', 'Productos', 'box'], ['/admin/categories', 'Categorías', 'tag'],
   ['/admin/services', 'Servicios', 'leaf'], ['/admin/projects', 'Portafolio', 'folder'], ['/admin/companies', 'Empresas', 'building'], ['/admin/ajustes', 'Ajustes', 'gear'], ['/admin/auditoria', 'Auditoría', 'shield']];
 const TABS = ['/admin', '/admin/leads', '/admin/trabajadores', '/admin/products'];
 
@@ -84,7 +86,7 @@ const shell = (req, title, body) => {
   const head = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex"><meta name="color-scheme" content="light dark"><title>${h(title)} · Admin Imagroup</title><link rel="icon" href="/img/brand/imagroup.webp">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/admin.css?v=4"><link rel="stylesheet" href="/css/admin-team.css?v=3"><script src="/js/theme.js?v=7"></script><script src="/js/admin.js?v=5" defer></script></head>`;
+<link rel="stylesheet" href="/css/admin.css?v=4"><link rel="stylesheet" href="/css/admin-team.css?v=3"><link rel="stylesheet" href="/css/builder.css?v=3"><script src="/js/theme.js?v=7"></script><script src="/js/admin.js?v=5" defer></script><script src="/js/builder.js?v=2" defer></script></head>`;
   const themeBtn = `<button type="button" class="ad-icon ad-theme" data-theme-btn aria-label="Cambiar entre modo claro y oscuro">${ic('sun')}${ic('moon')}</button>`;
   if (!req.admin) return `${head}<body class="ad-guest"><div class="ad-orbs" aria-hidden="true"><i></i><i></i><i></i></div>${themeBtn}<main class="ad-guest-main">${body}</main></body></html>`;
   const cur = req.originalUrl.split('?')[0].replace(/\/$/, '') || '/admin';
@@ -148,9 +150,11 @@ r.post('/:ent/:id', (req, res, next) => (req.admin && ENT[req.params.ent] ? uplo
 // Foto del trabajador para el carné: solo JPG o PNG (el PDF no admite WebP).
 const photoUpload = multer({ storage: upload.storage, limits: { fileSize: 4 * 1024 * 1024, files: 1 }, fileFilter: (_q, f, cb) => cb(null, /^image\/(jpeg|png)$/.test(f.mimetype)) });
 r.post('/trabajadores/:id', (req, res, next) => (req.admin ? photoUpload.single('photo__file')(req, res, next) : next()));
+mountBuilder(r);
 r.use(requireAdmin);
 r.post('/logout', (req, res) => { destroySession(req, res); res.redirect('/admin/login'); });
 mountWorkers(r, { shell: (...a) => shell(...a), ic: (n) => ic(n), csrf: (q) => csrf(q) });
+mountBuilderAdmin(r, { shell: (...a) => shell(...a), ic: (n) => ic(n), csrf: (q) => csrf(q) });
 
 // ---- Inicio del panel ----
 r.get('/', (req, res) => {
@@ -179,8 +183,8 @@ r.get('/', (req, res) => {
   const tmax = Math.max(1, ...top.map((t) => t.n));
   const pct = prods ? Math.round((pub / prods) * 100) : 0;
   const today = new Intl.DateTimeFormat('es-PE', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Lima' }).format(new Date());
-  const ACT = { login: ['in', 'Ingresó al panel'], create: ['plus', 'Creó'], update: ['pen', 'Editó'], delete: ['x', 'Eliminó'], export: ['down', 'Exportó'], password_set: ['shield', 'Definió su contraseña'], evaluate: ['star', 'Evaluó a'], approve: ['star', 'Aprobó reconocimiento de'], revoke: ['x', 'Revocó'], certificate: ['shield', 'Emitió certificado a'], badge: ['users', 'Generó carné de'] };
-  const ENTN = { products: 'un producto', categories: 'una categoría', services: 'un servicio', projects: 'un proyecto', companies: 'una empresa', settings: 'los ajustes', leads: 'solicitudes', workers: 'un trabajador', certificates: 'un certificado' };
+  const ACT = { login: ['in', 'Ingresó al panel'], create: ['plus', 'Creó'], update: ['pen', 'Editó'], delete: ['x', 'Eliminó'], export: ['down', 'Exportó'], password_set: ['shield', 'Definió su contraseña'], evaluate: ['star', 'Evaluó a'], approve: ['star', 'Aprobó reconocimiento de'], revoke: ['x', 'Revocó'], certificate: ['shield', 'Emitió certificado a'], badge: ['users', 'Generó carné de'], publish: ['ext', 'Publicó la página'], restore: ['pen', 'Restauró una versión de'], upload: ['plus', 'Subió una imagen'] };
+  const ENTN = { products: 'un producto', categories: 'una categoría', services: 'un servicio', projects: 'un proyecto', companies: 'una empresa', settings: 'los ajustes', leads: 'solicitudes', workers: 'un trabajador', certificates: 'un certificado', pages: 'una página' };
   const count = (n, suf = '') => `<b data-count="${n}" data-suf="${suf}">${n}${suf}</b>`;
 
   res.send(shell(req, 'Inicio', `<div class="dash">

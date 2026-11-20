@@ -5,6 +5,8 @@ import { loadSession, limited } from './auth.js';
 import * as V from './views.js';
 import admin from './admin.js';
 import { verifyData } from './workers.js';
+import { pageBySystem, pageBySlug, pagePath, navPages } from './pages.js';
+import { renderPage, visibleProducts } from './render.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -34,40 +36,31 @@ app.use((req, _res, next) => {
 
 const page = (res, opts) => res.send(V.layout(settings(), opts));
 const companies = () => all('SELECT * FROM companies ORDER BY sort');
-const visibleProducts = () => all(`SELECT p.*, c.name AS category, c.slug AS cslug FROM products p LEFT JOIN categories c ON c.id = p.category_id WHERE p.visible = 1 ORDER BY c.sort, p.sort`);
+const sysPage = (req, res, key) => res.send(renderPage(req, pageBySystem(key)));
+V.setNav(() => navPages().map((p) => [pagePath(p), p.nav_label || p.title, p.icon]));
 
-app.get('/', (req, res) => page(res, { path: '/', body: V.home(settings(), {
-  companies: companies(), services: all('SELECT * FROM services WHERE visible = 1 ORDER BY sort'),
-  products: visibleProducts(), projects: all('SELECT * FROM projects WHERE visible = 1 ORDER BY sort') }) }));
+app.get('/', (req, res) => sysPage(req, res, 'inicio'));
 
 app.get(['/imagroup', '/empresas/imagroup'], (_q, res) => res.redirect(301, '/servicios'));
 app.get(['/gregorian', '/empresas/gregorian'], (_q, res) => res.redirect(301, '/tienda'));
 
-app.get('/servicios', (req, res) => page(res, { title: 'Servicios', path: '/servicios', desc: 'Consultoría ambiental, residuos sólidos, agua y saneamiento, planos y obras.',
-  body: V.servicesPage(settings(), companies()[0], all('SELECT * FROM services WHERE visible = 1 ORDER BY sort')) }));
+app.get('/servicios', (req, res) => sysPage(req, res, 'servicios'));
 app.get('/servicios/:slug', (req, res, next) => {
   const v = get('SELECT * FROM services WHERE slug = ? AND visible = 1', req.params.slug);
   if (!v) return next();
   page(res, { title: v.title, desc: v.summary, path: '/servicios', body: V.servicePage(settings(), v, all('SELECT slug, title FROM services WHERE visible = 1 AND id != ? ORDER BY sort', v.id)) });
 });
 
-app.get('/tienda', (req, res) => {
-  const q = String(req.query.q || '').trim().slice(0, 60); const c = String(req.query.c || '');
-  const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-  const everything = visibleProducts(); const products = everything.filter((p) => (!c || p.cslug === c) && (!q || norm(p.name + ' ' + p.description + ' ' + p.category).includes(norm(q))));
-  page(res, { title: 'Tienda de equipos de protección', path: '/tienda', theme: 'shop', desc: 'Zapatos de seguridad, cascos, guantes, chalecos y ropa de trabajo. Precios en soles.',
-    body: V.shopPage(settings(), { co: companies()[1], categories: all('SELECT * FROM categories ORDER BY sort'), products, all: everything, q, c }) });
-});
+app.get('/tienda', (req, res) => sysPage(req, res, 'tienda'));
 app.get('/tienda/:slug', (req, res, next) => {
   const p = visibleProducts().find((x) => x.slug === req.params.slug);
   if (!p) return next();
   page(res, { title: p.name, desc: p.description, path: '/tienda', theme: 'shop',
     body: V.productPage(settings(), p, visibleProducts().filter((x) => x.category_id === p.category_id && x.id !== p.id).slice(0, 4).concat(visibleProducts().filter((x) => x.category_id !== p.category_id)).slice(0, 4)) });
 });
-app.get('/carrito', (req, res) => page(res, { title: 'Tu pedido', path: '/carrito', theme: 'shop',
-  body: V.cartPage(settings(), visibleProducts().map(({ slug, name, price_cents, image, availability }) => ({ slug, name, price: price_cents, image, availability }))) }));
+app.get('/carrito', (req, res) => sysPage(req, res, 'carrito'));
 
-app.get('/portafolio', (req, res) => page(res, { title: 'Ing. Jhossi Tenorio Montenegro · Portafolio', desc: 'Portafolio del Ing. Jhossi Tenorio Montenegro, ingeniero ambiental (CIP 285140): trayectoria, especialidades y formación.', path: '/portafolio', body: V.profilePage(settings()) }));
+app.get('/portafolio', (req, res) => sysPage(req, res, 'portafolio'));
 app.get('/portafolio/jhossi-tenorio', (req, res) => res.redirect(301, '/portafolio'));
 app.get('/portafolio/:slug', (req, res, next) => {
   const p = get('SELECT * FROM projects WHERE slug = ? AND visible = 1', req.params.slug);
@@ -90,7 +83,7 @@ app.get('/verificar/:code', (req, res) => {
     ${c.period ? `<dt>Periodo</dt><dd>${e(c.period)}</dd>` : ''}<dt>Emitido</dt><dd>${e(c.issued_at.slice(0, 10))}</dd><dt>Código</dt><dd>${e(c.code)}</dd></dl>`}
     <p class="vf-at">Consultado el ${new Date().toLocaleString('es-PE', { timeZone: 'America/Lima', dateStyle: 'long', timeStyle: 'short' })}</p></div></div></section>` });
 });
-app.get('/contacto', (req, res) => page(res, { title: 'Contacto', path: '/contacto', body: V.contactPage(settings(), String(req.query.asunto || '').slice(0, 140)) }));
+app.get('/contacto', (req, res) => sysPage(req, res, 'contacto'));
 
 // Filtro anti-spam común: campo trampa, tiempo mínimo de llenado y límite por IP.
 function spam(req) {
@@ -149,12 +142,16 @@ app.get('/sitemap.xml', (req, res) => {
   const urls = ['/', '/servicios', '/tienda', '/portafolio', '/contacto',
     ...all('SELECT slug FROM services WHERE visible = 1').map((r) => '/servicios/' + r.slug),
     ...all('SELECT slug FROM products WHERE visible = 1').map((r) => '/tienda/' + r.slug),
-    ...all('SELECT slug FROM projects WHERE visible = 1').map((r) => '/portafolio/' + r.slug)];
+    ...all('SELECT slug FROM projects WHERE visible = 1').map((r) => '/portafolio/' + r.slug),
+    ...all('SELECT slug FROM pages WHERE system IS NULL AND published IS NOT NULL').map((r) => '/' + r.slug)];
   res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.map((u) => `<url><loc>${base}${u}</loc></url>`).join('')}</urlset>`);
 });
 app.get('/healthz', (_q, res) => { get('SELECT 1 AS ok'); res.json({ ok: true, version: process.env.APP_VERSION || 'dev' }); });
 
 app.use('/admin', admin);
+
+// Páginas nuevas creadas en el diseñador.
+app.get('/:slug', (req, res, next) => { const p = pageBySlug(req.params.slug); if (!p) return next(); res.send(renderPage(req, p)); });
 
 app.use((req, res) => res.status(404).send(V.layout(settings(), { title: 'No encontrado', body: V.message('Página no encontrada', 'La dirección no existe o fue retirada.', '/') })));
 app.use((err, req, res, _next) => { console.error(new Date().toISOString(), req.method, req.path, err); res.status(500).send(V.layout(settings(), { body: V.message('Algo salió mal', 'Intenta de nuevo en unos segundos.', '/') })); });

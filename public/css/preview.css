@@ -1,0 +1,12 @@
+/* Solo en la vista previa del editor. */
+html.pv { scroll-behavior: auto; }
+.pv [data-bid] { cursor: pointer; }
+.pv [data-bid]::after { content: ""; position: absolute; inset: 0; z-index: 30; pointer-events: none; border: 2px solid transparent; border-radius: 4px; transition: border-color .2s, box-shadow .2s; }
+.pv [data-bid]:hover::after { border-color: rgb(47 134 204 / .6); }
+.pv [data-bid]::before { content: attr(data-blabel); position: absolute; z-index: 31; top: 8px; left: 8px; padding: 4px 10px; border-radius: 99px; background: #1a5f99; color: #fff; font: 700 12px/1.4 Archivo, sans-serif; opacity: 0; transform: translateY(-4px); transition: opacity .2s, transform .2s; pointer-events: none; }
+.pv [data-bid]:hover::before, .pv .pv-on::before { opacity: 1; transform: none; }
+.pv .pv-on::after { border-color: #c9a24a; box-shadow: inset 0 0 0 1px #c9a24a, 0 0 0 4px rgb(201 162 74 / .25); animation: pv-pulse 1.6s ease-out 1; }
+.pv .pv-on::before { background: #c9a24a; color: #1b1608; }
+.pv .bk-off::before { content: attr(data-blabel) " · oculto"; opacity: 1; transform: none; background: #6b7785; }
+@keyframes pv-pulse { 0% { box-shadow: inset 0 0 0 1px #c9a24a, 0 0 0 0 rgb(201 162 74 / .6); } 100% { box-shadow: inset 0 0 0 1px #c9a24a, 0 0 0 18px rgb(201 162 74 / 0); } }
+.pv .wa-float { pointer-events: none; opacity: .5; }
