@@ -64,6 +64,11 @@ const MIGRATIONS = [
    ALTER TABLE badges ADD COLUMN printed TEXT;`,
   // v0.5: el trabajador puede ocultarse de la página pública Equipo.
   `ALTER TABLE workers ADD COLUMN public INTEGER DEFAULT 1;`,
+  // v0.6: opiniones de clientes con enlace único; solo se publican al aprobarlas.
+  `CREATE TABLE reviews (id INTEGER PRIMARY KEY, code TEXT UNIQUE NOT NULL, worker_id INTEGER NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
+     job TEXT, client TEXT, s_pun INTEGER, s_gar INTEGER, s_cal INTEGER, again INTEGER, comment TEXT, show_name INTEGER DEFAULT 1,
+     status TEXT NOT NULL DEFAULT 'enviado', expires TEXT NOT NULL, created_by TEXT, created_at TEXT DEFAULT (datetime('now')), answered_at TEXT, decided_by TEXT);
+   CREATE INDEX reviews_worker ON reviews (worker_id, status);`,
 ];
 
 db.exec('CREATE TABLE IF NOT EXISTS _migrations (n INTEGER PRIMARY KEY)');

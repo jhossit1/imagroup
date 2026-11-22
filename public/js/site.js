@@ -267,16 +267,96 @@
     head.addEventListener('pointermove', (e) => { const r = head.getBoundingClientRect(); deck.style.setProperty('--px', ((e.clientX - r.left) / r.width - .5).toFixed(3)); deck.style.setProperty('--py', ((e.clientY - r.top) / r.height - .5).toFixed(3)); });
     head.addEventListener('pointerleave', () => { deck.style.removeProperty('--px'); deck.style.removeProperty('--py'); });
   }
+  // Buscar, filtrar por oficio y ordenar. Al reordenar, cada tarjeta se desliza a su nuevo lugar.
+  const norm = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
   document.querySelectorAll('[data-team]').forEach((sec) => {
-    const chips = sec.querySelectorAll('button[data-trade]'), items = sec.querySelectorAll('.tm-cell');
-    chips.forEach((b) => b.addEventListener('click', () => {
-      chips.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    const grid = sec.querySelector('.tm-grid'), items = [...sec.querySelectorAll('.tm-cell')], chips = sec.querySelectorAll('button[data-trade]');
+    const q = sec.querySelector('[data-q]'), sorts = sec.querySelectorAll('button[data-sort]'), pill = sec.querySelector('.tm-sort-pill');
+    const shown = sec.querySelector('[data-shown]'), empty = sec.querySelector('[data-empty]');
+    let trade = '', by = 'score';
+    const movePill = () => { const b = sec.querySelector('button[data-sort][aria-pressed="true"]'); if (pill && b) { pill.style.width = b.offsetWidth + 'px'; pill.style.transform = `translateX(${b.offsetLeft}px)`; } };
+    const apply = (replay) => {
+      const t = q ? norm(q.value) : '';
       let n = 0;
       items.forEach((c) => {
-        const show = !b.dataset.trade || c.dataset.trade === b.dataset.trade;
-        c.classList.toggle('out', !show);
-        if (show) { c.style.setProperty('--i', Math.min(n++, 8)); c.classList.remove('on'); void c.offsetWidth; c.classList.add('on'); }
+        const ok = (!trade || c.dataset.trade === trade) && (!t || t.split(/\s+/).every((w) => c.dataset.q.includes(w)));
+        const was = !c.classList.contains('out');
+        c.classList.toggle('out', !ok);
+        if (ok && (replay || !was)) { c.style.setProperty('--i', Math.min(n, 8)); c.classList.remove('on'); void c.offsetWidth; c.classList.add('on'); }
+        if (ok) n++;
       });
-    }));
+      if (empty) empty.hidden = n > 0;
+      if (shown) shown.textContent = n === items.length ? '' : `${n === 1 ? 'Se muestra 1 persona' : `Se muestran ${n} personas`} de ${items.length}`;
+    };
+    const order = () => {
+      const first = new Map(items.map((c) => [c, c.getBoundingClientRect()]));
+      const key = { score: (c) => -c.dataset.score, cli: (c) => -c.dataset.cli, name: () => 0 }[by];
+      items.sort((a, b) => key(a) - key(b) || a.dataset.name.localeCompare(b.dataset.name)).forEach((c) => grid.append(c));
+      if (still) return;
+      items.forEach((c) => {
+        const a = first.get(c), b = c.getBoundingClientRect(), dx = a.left - b.left, dy = a.top - b.top;
+        if ((dx || dy) && !c.classList.contains('out')) c.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], { duration: 520, easing: 'cubic-bezier(.2,.8,.2,1)' });
+      });
+    };
+    chips.forEach((b) => b.addEventListener('click', () => { chips.forEach((x) => x.setAttribute('aria-pressed', String(x === b))); trade = b.dataset.trade; apply(true); }));
+    q?.addEventListener('input', () => apply(false));
+    sorts.forEach((b) => b.addEventListener('click', () => { sorts.forEach((x) => x.setAttribute('aria-pressed', String(x === b))); by = b.dataset.sort; movePill(); order(); }));
+    sec.querySelector('[data-clear]')?.addEventListener('click', () => { if (q) q.value = ''; trade = ''; chips.forEach((x) => x.setAttribute('aria-pressed', String(!x.dataset.trade))); apply(true); q?.focus(); });
+    movePill(); addEventListener('resize', movePill);
   });
+
+  // Opiniones de clientes: tocar una barra de estrellas filtra la lista; "Ver todas" despliega el resto.
+  document.querySelectorAll('[data-cl]').forEach((sec) => {
+    const bars = sec.querySelectorAll('button[data-stars]'), lis = [...sec.querySelectorAll('.tm-revs li')], more = sec.querySelector('[data-more]'), out = sec.querySelector('[data-cl-out]');
+    let all = false;
+    const show = () => {
+      const on = sec.querySelector('button[data-stars][aria-pressed="true"]')?.dataset.stars;
+      let n = 0;
+      lis.forEach((li) => {
+        const ok = on ? li.dataset.s === on : all || !('extra' in li.dataset);
+        if (ok && li.hidden) { li.style.setProperty('--i', Math.min(n, 5)); li.classList.remove('in'); void li.offsetWidth; li.classList.add('in'); }
+        li.hidden = !ok; if (ok) n++;
+      });
+      out.hidden = !on; out.textContent = on ? `${n === 1 ? 'Una opinión' : n + ' opiniones'} de ${on} ${on === '1' ? 'estrella' : 'estrellas'}. Toca la barra otra vez para ver todas.` : '';
+      if (more) more.hidden = !!on || all;
+    };
+    bars.forEach((b) => b.addEventListener('click', () => { const was = b.getAttribute('aria-pressed') === 'true'; bars.forEach((x) => x.setAttribute('aria-pressed', 'false')); b.setAttribute('aria-pressed', String(!was)); show(); }));
+    more?.addEventListener('click', () => { all = true; show(); });
+  });
+})();
+
+// Formulario de opinión del cliente: estrellas con respuesta, barra de avance y contador de caracteres.
+(() => {
+  const f = document.querySelector('[data-op]'); if (!f) return;
+  const SAY = ['', 'Muy malo', 'Malo', 'Regular', 'Bueno', 'Excelente'];
+  const qs = [...f.querySelectorAll('.op-q')], bar = f.querySelector('[data-op-bar]'), left = f.querySelector('[data-op-left]');
+  const upd = () => {
+    const done = qs.filter((q) => q.querySelector('input:checked')).length, rest = qs.length - done;
+    bar.style.transform = `scaleX(${done / qs.length})`;
+    left.textContent = rest ? (rest === 1 ? 'Falta 1 pregunta' : `Faltan ${rest} preguntas`) : 'Listo. Puedes enviar tu opinión.';
+    f.classList.toggle('ready', !rest);
+  };
+  qs.forEach((q) => {
+    const say = q.querySelector('[data-say]');
+    q.addEventListener('change', (e) => {
+      q.classList.add('done');
+      if (say) { say.textContent = SAY[+e.target.value]; say.classList.remove('bump'); void say.offsetWidth; say.classList.add('bump'); }
+      upd();
+      // Al responder, la siguiente pregunta sin contestar se acerca a la vista en pantallas chicas.
+      const next = qs.find((x) => !x.querySelector('input:checked'));
+      if (next && innerWidth < 760) setTimeout(() => next.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' }), 260);
+    });
+    if (say) q.querySelectorAll('label').forEach((l) => {
+      l.addEventListener('pointerenter', () => { say.textContent = l.title; });
+      l.addEventListener('pointerleave', () => { const c = q.querySelector('input:checked'); say.textContent = c ? SAY[+c.value] : 'Toca una estrella'; });
+    });
+  });
+  const ta = f.querySelector('[data-op-count]'), n = f.querySelector('[data-op-n]');
+  ta?.addEventListener('input', () => { n.textContent = `${ta.value.length} de 600`; });
+  f.addEventListener('submit', (e) => {
+    const miss = qs.find((q) => !q.querySelector('input:checked'));
+    if (miss) { e.preventDefault(); miss.classList.remove('shake'); void miss.offsetWidth; miss.classList.add('shake'); miss.scrollIntoView({ behavior: 'smooth', block: 'center' }); miss.querySelector('input').focus({ preventScroll: true }); return; }
+    f.querySelector('[data-op-send]').disabled = true; f.classList.add('sending');
+  });
+  upd();
 })();

@@ -6,6 +6,7 @@ import { CRITERIA, LEVELS, levelOf, evaluate, isTrusted, TRUST_RULE, periodName,
 import { certificatePdf } from './cert.js';
 import { badgePdf } from './badge.js';
 import { teamPath } from './team.js';
+import { reviewsCard, mountReviewsAdmin, pendingReviews, clientScore } from './reviews.js';
 import QRCode from 'qrcode';
 
 const thisPeriod = () => new Date(Date.now() - 5 * 36e5).toISOString().slice(0, 7);
@@ -47,6 +48,7 @@ export function monthStar() {
 }
 
 export function mountWorkers(r, { shell, ic, csrf }) {
+  mountReviewsAdmin(r);
   const load = (id) => get('SELECT * FROM workers WHERE id = ?', id);
 
   // ---- Lista del equipo ----
@@ -74,11 +76,12 @@ export function mountWorkers(r, { shell, ic, csrf }) {
       .map(([i, v, l, c], n) => `<div class="w-kpi ${c} rise" style="--i:${n}"><span class="w-kpi-i">${ic(i)}</span><b ${typeof v === 'number' ? `data-count="${v}"` : ''}>${v}</b><small>${l}</small></div>`).join('')}</div>
     ${podium.length ? `<section class="card w-podium rise" style="--i:2"><header><h2>Podio de ${h(periodName(per))}</h2><span class="d-tag">evaluaciones aprobadas</span></header><div class="w-steps">
       ${order.map((p, i) => (p ? `<a class="w-step s${[2, 1, 3][i]}" href="/admin/trabajadores/${p.id}" style="--i:${[1, 0, 2][i]}">${avatar(p, ' big')}<b>${h(p.name.split(' ').slice(0, 2).join(' '))}</b><small>${h(p.trade || '')}</small>${chip(p.level)}<span class="w-block"><em>${[2, 1, 3][i]}</em>${Math.round(p.score)} pts</span></a>` : '<span class="w-step empty"></span>')).join('')}</div></section>` : ''}
+    ${pendingReviews().map((p) => `<a class="w-op-alert rise" href="/admin/trabajadores/${p.worker_id}#opiniones">${ic('star')}<span><b>${p.n === 1 ? 'Una opinión de cliente' : p.n + ' opiniones de clientes'} por revisar</b><small>${h(p.name)}: revísala y publícala o déjala oculta.</small></span></a>`).join('')}
     <form class="a-filters w-search"><label class="w-q"><span class="sr">Buscar</span><input name="q" value="${h(q)}" placeholder="Buscar por nombre, oficio o zona" type="search"></label>
     <select name="st" aria-label="Estado"><option value="">Todos los estados</option>${STATUS.map((s) => `<option ${s === st ? 'selected' : ''}>${s}</option>`).join('')}</select><button class="a-btn ghost">Filtrar</button></form>
     ${ws.length ? `<div class="w-grid">${ws.map((w, i) => `<a class="w-card st-${h(w.status)}" href="/admin/trabajadores/${w.id}" style="--i:${Math.min(i, 12)}">
       ${avatar(w)}<span class="w-info"><b>${h(w.name)}</b><small>${h([w.trade, w.zone].filter(Boolean).join(' · ') || 'Sin oficio registrado')}</small>
-      <span class="w-tags"><span class="w-st">${h(w.status)}</span>${w.level ? chip(w.level) : ''}${trusted.has(w.id) ? trustBadge : ''}</span></span>${ring(w.score, w.level)}</a>`).join('')}</div>`
+      <span class="w-tags"><span class="w-st">${h(w.status)}</span>${w.level ? chip(w.level) : ''}${trusted.has(w.id) ? trustBadge : ''}${(() => { const c = clientScore(w.id); return c ? `<span class="w-st w-cli">Clientes ${num(c.v)} de 5</span>` : ''; })()}</span></span>${ring(w.score, w.level)}</a>`).join('')}</div>`
       : `<div class="a-empty w-empty"><span class="w-empty-i">${ic('users')}</span><b>${q || st ? 'Nadie coincide con ese filtro.' : 'Aún no hay trabajadores.'}</b><span>Agrega a tu equipo para evaluarlo cada mes, aprobar bonos y emitir certificados.</span><a class="a-btn" href="/admin/trabajadores/nuevo">${ic('plus')}Agregar el primero</a></div>`}`));
   });
 
@@ -171,6 +174,7 @@ export function mountWorkers(r, { shell, ic, csrf }) {
       ${rt ? `<div class="w-rate-g">${rt.map((r, i) => `<div class="w-rate-c" style="--cc:${r.c};--i:${i}"><span class="w-rate-t">${h(r.t)}</span>${stars(r.v, r.c, i)}<b>${r.v ? num(r.v) : '—'}<small> / 5</small></b></div>`).join('')}</div>
         <p class="a-help">Promedio de sus últimas evaluaciones aprobadas (hasta tres meses). Sale en su certificado y en su carné.</p>`
       : `<div class="w-rate-empty"><span class="w-stars big" style="--f:0%"></span><p>Califica su <b>puntualidad</b>, la <b>garantía</b> de su trabajo y su <b>calidad</b> al cerrar el mes. Al aprobar la evaluación, las estrellas aparecen aquí, en su certificado y en su carné.</p></div>`}</section>
+    ${reviewsCard(req, w, { csrf, ic, base: baseUrl(req), fresh: String(req.query.enlace || '') })}
     <div class="a-cols">
       <section class="card rise" style="--i:2"><header><h2>Historial de puntaje</h2><span class="d-tag">${evs.length} meses</span></header>
         ${hist.length ? `<div class="w-hist">${hist.map((e, i) => `<span style="--h:${Math.max(4, e.score)};--i:${i};--lc:${levelOf(e.level).c}" class="${e.status}" title="${h(periodName(e.period))}: ${e.score} (${h(e.status)})"><b>${Math.round(e.score)}</b><i></i><small>${h(e.period.slice(5))}/${h(e.period.slice(2, 4))}</small></span>`).join('')}</div>` : '<p class="d-empty">Sin evaluaciones todavía.</p>'}</section>

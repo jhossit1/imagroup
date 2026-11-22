@@ -86,7 +86,7 @@ const shell = (req, title, body) => {
   const head = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex"><meta name="color-scheme" content="light dark"><title>${h(title)} · Admin Imagroup</title><link rel="icon" href="/img/brand/imagroup.webp">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/admin.css?v=4"><link rel="stylesheet" href="/css/admin-team.css?v=6"><link rel="stylesheet" href="/css/builder.css?v=3"><script src="/js/theme.js?v=7"></script><script src="/js/admin.js?v=7" defer></script><script src="/js/builder.js?v=2" defer></script></head>`;
+<link rel="stylesheet" href="/css/admin.css?v=4"><link rel="stylesheet" href="/css/admin-team.css?v=8"><link rel="stylesheet" href="/css/builder.css?v=3"><script src="/js/theme.js?v=7"></script><script src="/js/admin.js?v=8" defer></script><script src="/js/builder.js?v=2" defer></script></head>`;
   const themeBtn = `<button type="button" class="ad-icon ad-theme" data-theme-btn aria-label="Cambiar entre modo claro y oscuro">${ic('sun')}${ic('moon')}</button>`;
   if (!req.admin) return `${head}<body class="ad-guest"><div class="ad-orbs" aria-hidden="true"><i></i><i></i><i></i></div>${themeBtn}<main class="ad-guest-main">${body}</main></body></html>`;
   const cur = req.originalUrl.split('?')[0].replace(/\/$/, '') || '/admin';

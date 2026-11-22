@@ -6,6 +6,7 @@ import * as V from './views.js';
 import admin from './admin.js';
 import { verifyData } from './workers.js';
 import { publicWorker, teamPath, teamProfile } from './team.js';
+import { reviewByCode, reviewForm, reviewDone, reviewSubmit, isOpen } from './reviews.js';
 import { pageBySystem, pageBySlug, pagePath, navPages } from './pages.js';
 import { renderPage, visibleProducts } from './render.js';
 
@@ -92,6 +93,26 @@ app.get('/equipo/:ref', (req, res, next) => {
   const w = publicWorker(parseInt(req.params.ref, 10)); if (!w) return next();
   if (req.params.ref !== teamPath(w).slice(8)) return res.redirect(301, teamPath(w));
   page(res, { title: w.name, desc: `${w.name}${w.trade ? ', ' + w.trade : ''}: calificación de puntualidad, garantía y calidad.`, path: '/equipo', body: teamProfile(w) });
+});
+
+// Opinión del cliente: enlace único creado en el panel. Nunca indexado.
+const opWorker = (rv) => get(`SELECT w.id, w.name, w.trade, w.photo, w.status, COALESCE(w.public, 1) AS public, co.name AS company FROM workers w LEFT JOIN companies co ON co.id = w.company_id WHERE w.id = ?`, rv.worker_id);
+const opClosed = (res, rv) => page(res, { title: 'Opinión', body: V.message(rv?.answered_at ? 'Ya recibimos tu opinión' : 'Este enlace no está disponible',
+  rv?.answered_at ? 'Gracias. Este enlace sirve una sola vez.' : 'Puede que haya vencido o que se haya anulado. Pide un enlace nuevo a quien te lo envió.', '/equipo') });
+app.get('/opinar/:code', (req, res) => {
+  const rv = reviewByCode(req.params.code); res.set('X-Robots-Tag', 'noindex');
+  if (!rv || !isOpen(rv)) return res.status(rv ? 410 : 404), opClosed(res, rv);
+  page(res, { title: 'Tu opinión', path: '/opinar', body: reviewForm(rv, opWorker(rv)) });
+});
+app.post('/opinar/:code', (req, res) => {
+  const rv = reviewByCode(req.params.code); res.set('X-Robots-Tag', 'noindex');
+  if (!rv || !isOpen(rv)) return opClosed(res, rv);
+  const w = opWorker(rv);
+  if (req.body.website) return opClosed(res, { answered_at: 1 });
+  if (limited('op:' + req.ip, 10, 60 * 60e3)) return res.status(429), page(res, { title: 'Tu opinión', body: reviewForm(rv, w, 'Demasiados envíos seguidos. Intenta en unos minutos.') });
+  const err = reviewSubmit(rv, req.body);
+  if (err) return res.status(400), page(res, { title: 'Tu opinión', body: reviewForm(rv, w, err) });
+  page(res, { title: 'Gracias', body: reviewDone(reviewByCode(rv.code), w, w.public && w.status !== 'inactivo' ? teamPath(w) : '') });
 });
 
 // Filtro anti-spam común: campo trampa, tiempo mínimo de llenado y límite por IP.

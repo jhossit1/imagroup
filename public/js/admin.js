@@ -136,3 +136,10 @@ if (wf) {
   ['dragleave', 'drop'].forEach((t) => drop.addEventListener(t, () => drop.classList.remove('over')));
   drop.addEventListener('drop', (e) => { e.preventDefault(); if (e.dataTransfer.files[0]) { file.files = e.dataTransfer.files; file.dispatchEvent(new Event('change')); } });
 }
+
+// Opiniones: copiar el enlace para el cliente.
+document.querySelectorAll('[data-copy]').forEach((b) => b.addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(b.dataset.copy); } catch { b.previousElementSibling?.select(); document.execCommand('copy'); }
+  const t = b.lastChild.textContent; b.classList.add('ok'); b.lastChild.textContent = 'Copiado'; setTimeout(() => { b.classList.remove('ok'); b.lastChild.textContent = t; }, 1800);
+}));
+document.querySelectorAll('[data-select]').forEach((i) => i.addEventListener('focus', () => i.select()));
