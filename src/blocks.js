@@ -3,7 +3,7 @@
 // Los valores vienen del administrador: todo se escapa al dibujar y los enlaces pasan por safeUrl.
 import { h, money, wa, lines, ICON, frame, sm, productCard, shopCard, art, figure, SI, leadForm, safeUrl, mi } from './views.js';
 import { PROFILE } from './profile.js';
-import { teamGrid, teamMethod } from './team.js';
+import { teamHead, teamGrid, teamMethod } from './team.js';
 
 // ---------- Utilidades de texto ----------
 export { safeUrl, mi };
@@ -309,9 +309,9 @@ export const BLOCKS = {
   // ======================= Equipo =======================
   'team-head': {
     label: 'Portada del equipo', group: 'Equipo', icon: 'hero', desc: 'Título y texto de presentación de la página Equipo.',
-    fields: [{ k: 'title', l: 'Título', t: 'text' }, { k: 'lead', l: 'Texto', t: 'md' }],
-    defaults: () => ({ title: 'Nuestro equipo de obra', lead: 'Notas reales de **puntualidad**, **garantía** y **calidad**, mes a mes.' }),
-    render: (d) => `<section class="wrap tm-head"><h1 class="rise">${mi(d.title)}</h1>${d.lead ? `<div class="lead rise">${md(d.lead)}</div>` : ''}</section>`,
+    fields: [{ k: 'title', l: 'Título', t: 'text' }, { k: 'lead', l: 'Texto', t: 'md' }, { k: 'show_deck', l: 'Mostrar las fotos de los mejores puntajes en 3D', t: 'bool' }],
+    defaults: () => ({ show_deck: true, title: 'Nuestro equipo de obra', lead: 'Notas reales de **puntualidad**, **garantía** y **calidad**, mes a mes.' }),
+    render: (d) => teamHead(d),
   },
   'team-grid': {
     label: 'Tarjetas del equipo', group: 'Equipo', icon: 'cards', desc: 'Cada trabajador con su foto, nivel, puntaje y estrellas. Los datos salen de Trabajadores.',

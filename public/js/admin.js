@@ -81,10 +81,55 @@ if (wf) {
     }
     bump(box); card.classList.remove('flip');
   };
+  // Encuadre: se arrastra y se acerca la foto dentro de un marco 3:4; se guarda ya recortada (600 × 800).
+  const dlg = wf.querySelector('[data-crop]'), vp = dlg?.querySelector('.crop-vp'), cimg = vp?.querySelector('img'), zoom = dlg?.querySelector('[data-zoom]');
+  let st = null;
+  const place = () => {
+    const { iw, ih, base } = st, s = base * st.z, W = vp.clientWidth, H = vp.clientHeight;
+    st.x = Math.min(0, Math.max(W - iw * s, st.x)); st.y = Math.min(0, Math.max(H - ih * s, st.y));
+    cimg.style.transform = `translate(${st.x}px, ${st.y}px) scale(${s})`;
+  };
+  const openCrop = (src) => {
+    const im = new Image();
+    im.onload = () => {
+      dlg.showModal();
+      const W = vp.clientWidth, H = vp.clientHeight, base = Math.max(W / im.naturalWidth, H / im.naturalHeight);
+      // Arranca centrado y un poco arriba: en las fotos de cuerpo entero la cara suele estar en el tercio superior.
+      st = { im, iw: im.naturalWidth, ih: im.naturalHeight, base, z: 1, x: (W - im.naturalWidth * base) / 2, y: (H - im.naturalHeight * base) * .2 };
+      cimg.src = src; zoom.value = 1; place();
+    };
+    im.src = src;
+  };
+  const zoomTo = (z, cx = vp.clientWidth / 2, cy = vp.clientHeight / 2) => {
+    const s0 = st.base * st.z; st.z = Math.min(4, Math.max(1, z)); const s1 = st.base * st.z;
+    st.x = cx - ((cx - st.x) * s1) / s0; st.y = cy - ((cy - st.y) * s1) / s0; zoom.value = st.z; place();
+  };
+  if (dlg) {
+    let drag = null;
+    vp.addEventListener('pointerdown', (e) => { drag = { x: e.clientX - st.x, y: e.clientY - st.y }; vp.setPointerCapture(e.pointerId); vp.classList.add('grab'); });
+    vp.addEventListener('pointermove', (e) => { if (!drag) return; st.x = e.clientX - drag.x; st.y = e.clientY - drag.y; place(); });
+    vp.addEventListener('pointerup', () => { drag = null; vp.classList.remove('grab'); });
+    vp.addEventListener('wheel', (e) => { e.preventDefault(); const r = vp.getBoundingClientRect(); zoomTo(st.z * (e.deltaY < 0 ? 1.08 : .92), e.clientX - r.left, e.clientY - r.top); }, { passive: false });
+    zoom.addEventListener('input', () => zoomTo(+zoom.value));
+    dlg.addEventListener('cancel', () => { if (!dlg.dataset.keep) file.value = ''; });
+    dlg.querySelector('[data-crop-cancel]').addEventListener('click', () => { if (!dlg.dataset.keep) file.value = ''; dlg.close(); });
+    dlg.querySelector('[data-crop-ok]').addEventListener('click', () => {
+      const k = 600 / vp.clientWidth, c = document.createElement('canvas'); c.width = 600; c.height = 800;
+      const g = c.getContext('2d'), s = st.base * st.z * k;
+      g.fillStyle = '#fff'; g.fillRect(0, 0, 600, 800); g.drawImage(st.im, st.x * k, st.y * k, st.iw * s, st.ih * s);
+      c.toBlob((b) => {
+        const dt = new DataTransfer(); dt.items.add(new File([b], 'foto.jpg', { type: 'image/jpeg' })); file.files = dt.files;
+        const rm = wf.querySelector('[data-live-rm]'); if (rm) rm.checked = false;
+        show(c.toDataURL('image/jpeg', .85)); dlg.close();
+      }, 'image/jpeg', .88);
+    });
+    wf.querySelector('[data-recrop]')?.addEventListener('click', (e) => { dlg.dataset.keep = '1'; openCrop(e.currentTarget.dataset.recrop); });
+  }
   file?.addEventListener('change', () => {
     const f = file.files[0]; if (!f) return;
-    if (f.size > 4 * 1024 * 1024) { alert('La foto pesa más de 4 MB. Elige una más liviana.'); file.value = ''; return; }
-    const r = new FileReader(); r.onload = () => show(r.result); r.readAsDataURL(f);
+    if (!/^image\/(jpeg|png|webp)$/.test(f.type)) { alert('Elige una foto JPG o PNG.'); file.value = ''; return; }
+    if (f.size > 25 * 1024 * 1024) { alert('La foto pesa más de 25 MB. Elige una más liviana.'); file.value = ''; return; }
+    const r = new FileReader(); r.onload = () => { if (dlg) { delete dlg.dataset.keep; openCrop(r.result); } else show(r.result); }; r.readAsDataURL(f);
   });
   wf.querySelector('[data-live-rm]')?.addEventListener('change', (e) => { if (e.target.checked) show(''); });
   ['dragenter', 'dragover'].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add('over'); }));

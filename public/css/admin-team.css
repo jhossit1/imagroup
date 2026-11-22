@@ -294,3 +294,14 @@ img.w-av { object-fit: cover; padding: 0; }
 @media (prefers-reduced-motion: reduce) { .w-stars { animation: none; } }
 .bc-steps li { display: block; position: relative; padding-left: 34px; line-height: 1.45; }
 .bc-steps li::before { position: absolute; left: 0; top: -1px; }
+/* Encuadre de la foto */
+.crop { width: min(420px, calc(100vw - 32px)); padding: 22px; border: 0; border-radius: 22px; background: var(--card); color: var(--tx); box-shadow: 0 40px 80px -30px rgb(0 0 0 / .6); }
+.crop[open] { animation: popin .45s var(--spring); } .crop::backdrop { background: rgb(10 18 28 / .55); backdrop-filter: blur(4px); }
+.crop h2 { margin: 0 0 4px; } .crop .a-help { margin: 0 0 14px; }
+.crop-vp { position: relative; width: min(300px, 100%); aspect-ratio: 3 / 4; margin: 0 auto; overflow: hidden; border-radius: 16px; background: #0e1722; cursor: grab; touch-action: none; user-select: none; }
+.crop-vp.grab { cursor: grabbing; }
+.crop-vp img { position: absolute; left: 0; top: 0; max-width: none; width: auto; height: auto; transform-origin: 0 0; pointer-events: none; }
+.crop-guide { position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 0 2px rgb(255 255 255 / .7); border-radius: inherit;
+  background: radial-gradient(ellipse 34% 26% at 50% 36%, transparent 96%, rgb(255 255 255 / .55) 97% 99%, transparent 100%); }
+.crop-z { display: grid; gap: 6px; margin: 16px 0; } .crop-z input { width: 100%; accent-color: var(--ac); }
+.crop .a-actions { justify-content: flex-end; }

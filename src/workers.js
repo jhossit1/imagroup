@@ -114,8 +114,12 @@ export function mountWorkers(r, { shell, ic, csrf }) {
       <div class="w-2"><label>Teléfono <small>(opcional)</small><input name="phone" inputmode="tel" maxlength="20" value="${h(w.phone)}"></label>
       <label>Fecha de incorporación<input name="joined" type="date" value="${h(w.joined)}"></label></div></section>
     <section class="card wf-s" style="--i:1">${step(2, 'Foto para el carné', 'Opcional. De frente, con fondo claro. JPG o PNG de hasta 4 MB.')}
-      <div class="w-photo"><label class="wf-drop" data-drop>${w.photo ? `<img src="${h(w.photo)}" alt="">` : `<span class="w-photo-ph">${ic('users')}</span>`}<span><b>${w.photo ? 'Cambiar foto' : 'Elegir foto'}</b><small>Toca aquí o arrastra la imagen</small></span><input type="file" name="photo__file" accept="image/jpeg,image/png" data-live-photo></label><input type="hidden" name="photo" value="${h(w.photo)}">
-      ${w.photo ? '<label class="a-check"><input type="checkbox" name="photo_rm" value="1" data-live-rm> Quitar foto</label>' : ''}</div></section>
+      <div class="w-photo"><label class="wf-drop" data-drop>${w.photo ? `<img src="${h(w.photo)}" alt="">` : `<span class="w-photo-ph">${ic('users')}</span>`}<span><b>${w.photo ? 'Cambiar foto' : 'Elegir foto'}</b><small>Toca aquí o arrastra la imagen</small></span><input type="file" name="photo__file" accept="image/jpeg,image/png,image/webp" data-live-photo></label><input type="hidden" name="photo" value="${h(w.photo)}">
+      ${w.photo ? `<button type="button" class="a-btn ghost sm" data-recrop="${h(w.photo)}">${ic('pen')}Ajustar encuadre</button><label class="a-check"><input type="checkbox" name="photo_rm" value="1" data-live-rm> Quitar foto</label>` : ''}</div>
+      <dialog class="crop" data-crop aria-labelledby="crop-t"><h2 id="crop-t">Encuadra la foto</h2><p class="a-help">Arrastra para mover y usa la barra para acercar. Deja la cara y los hombros dentro del marco.</p>
+        <div class="crop-vp"><img alt="Foto a recortar" draggable="false"><span class="crop-guide" aria-hidden="true"></span></div>
+        <label class="crop-z">Acercar<input type="range" min="1" max="4" step="0.01" value="1" data-zoom></label>
+        <div class="a-actions"><button type="button" class="a-btn" data-crop-ok>${ic('plus')}Usar este encuadre</button><button type="button" class="a-btn ghost" data-crop-cancel>Cancelar</button></div></dialog></section>
     <section class="card wf-s" style="--i:2">${step(3, 'Su trabajo', 'Oficio y zona salen en el carné. El estado decide si aparece como disponible.')}
       <div class="w-2"><label>Oficio o especialidad<input name="trade" maxlength="80" value="${h(w.trade)}" placeholder="Operario, maestro de obra, chofer…" data-live="trade"></label>
       <label>Zona u obra<input name="zone" maxlength="80" value="${h(w.zone)}" data-live="zone"></label></div>

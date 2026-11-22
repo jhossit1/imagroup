@@ -238,18 +238,45 @@
     io.observe(typed);
   }
 })();
-
-// Equipo: filtrar las tarjetas por oficio con una entrada en cascada.
-document.querySelectorAll('[data-team]').forEach((sec) => {
-  const chips = sec.querySelectorAll('[data-trade]:is(button)'), cards = sec.querySelectorAll('.tm-card');
-  chips.forEach((b) => b.addEventListener('click', () => {
-    chips.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-    let n = 0;
-    const run = () => cards.forEach((c) => {
-      const show = !b.dataset.trade || c.dataset.trade === b.dataset.trade;
-      c.classList.toggle('out', !show);
-      if (show) { c.style.setProperty('--i', Math.min(n++, 10)); c.style.animation = 'none'; void c.offsetWidth; c.style.animation = ''; }
+// Equipo: tarjetas que entran en 3D al aparecer, se inclinan con el puntero, credencial que gira y filtro por oficio.
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches, hover = matchMedia('(hover: hover)').matches;
+  const cells = document.querySelectorAll('.tm-cell');
+  if (cells.length) {
+    if ('IntersectionObserver' in window && !still) {
+      const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('on'); io.unobserve(e.target); } }), { rootMargin: '0px 0px -6% 0px' });
+      cells.forEach((c) => io.observe(c));
+    } else cells.forEach((c) => c.classList.add('on'));
+  }
+  if (hover && !still) document.querySelectorAll('[data-tilt]').forEach((el) => {
+    el.addEventListener('pointermove', (e) => {
+      if (el.dataset.busy) return;
+      const r = el.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+      el.classList.add('tilting');
+      el.style.setProperty('--ry', ((x - .5) * 16).toFixed(2) + 'deg'); el.style.setProperty('--rx', ((.5 - y) * 14).toFixed(2) + 'deg');
+      el.style.setProperty('--mx', (x * 100).toFixed(1) + '%'); el.style.setProperty('--my', (y * 100).toFixed(1) + '%');
     });
-    document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches ? document.startViewTransition(run).finished.catch(() => {}) : run();
+    el.addEventListener('pointerleave', () => { el.classList.remove('tilting'); el.style.removeProperty('--rx'); el.style.removeProperty('--ry'); });
+  });
+  document.querySelectorAll('.tm-cred[data-flip]').forEach((b) => b.addEventListener('click', () => {
+    b.classList.remove('tilting'); b.dataset.busy = '1'; b.classList.toggle('flip'); setTimeout(() => delete b.dataset.busy, 900);
   }));
-});
+  const deck = document.querySelector('.tm-deck');
+  if (deck && hover && !still) {
+    const head = deck.closest('.tm-head');
+    head.addEventListener('pointermove', (e) => { const r = head.getBoundingClientRect(); deck.style.setProperty('--px', ((e.clientX - r.left) / r.width - .5).toFixed(3)); deck.style.setProperty('--py', ((e.clientY - r.top) / r.height - .5).toFixed(3)); });
+    head.addEventListener('pointerleave', () => { deck.style.removeProperty('--px'); deck.style.removeProperty('--py'); });
+  }
+  document.querySelectorAll('[data-team]').forEach((sec) => {
+    const chips = sec.querySelectorAll('button[data-trade]'), items = sec.querySelectorAll('.tm-cell');
+    chips.forEach((b) => b.addEventListener('click', () => {
+      chips.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      let n = 0;
+      items.forEach((c) => {
+        const show = !b.dataset.trade || c.dataset.trade === b.dataset.trade;
+        c.classList.toggle('out', !show);
+        if (show) { c.style.setProperty('--i', Math.min(n++, 8)); c.classList.remove('on'); void c.offsetWidth; c.classList.add('on'); }
+      });
+    }));
+  });
+})();
