@@ -5,6 +5,7 @@ import { loadSession, limited } from './auth.js';
 import * as V from './views.js';
 import admin from './admin.js';
 import { verifyData } from './workers.js';
+import { publicWorker, teamPath, teamProfile } from './team.js';
 import { pageBySystem, pageBySlug, pagePath, navPages } from './pages.js';
 import { renderPage, visibleProducts } from './render.js';
 
@@ -86,6 +87,12 @@ app.get('/verificar/:code', (req, res) => {
     <p class="vf-at">Consultado el ${new Date().toLocaleString('es-PE', { timeZone: 'America/Lima', dateStyle: 'long', timeStyle: 'short' })}</p></div></div></section>` });
 });
 app.get('/contacto', (req, res) => sysPage(req, res, 'contacto'));
+app.get('/equipo', (req, res) => sysPage(req, res, 'equipo'));
+app.get('/equipo/:ref', (req, res, next) => {
+  const w = publicWorker(parseInt(req.params.ref, 10)); if (!w) return next();
+  if (req.params.ref !== teamPath(w).slice(8)) return res.redirect(301, teamPath(w));
+  page(res, { title: w.name, desc: `${w.name}${w.trade ? ', ' + w.trade : ''}: calificación de puntualidad, garantía y calidad.`, path: '/equipo', body: teamProfile(w) });
+});
 
 // Filtro anti-spam común: campo trampa, tiempo mínimo de llenado y límite por IP.
 function spam(req) {
@@ -141,7 +148,7 @@ app.post('/pedido', (req, res) => {
 app.get('/robots.txt', (req, res) => res.type('text').send(settings().review_banner === '1' ? 'User-agent: *\nDisallow: /\n' : `User-agent: *\nDisallow: /admin\nSitemap: ${req.protocol}://${req.get('host')}/sitemap.xml\n`));
 app.get('/sitemap.xml', (req, res) => {
   const base = `${req.protocol}://${req.get('host')}`;
-  const urls = ['/', '/servicios', '/tienda', '/portafolio', '/contacto',
+  const urls = ['/', '/servicios', '/tienda', '/portafolio', '/contacto', '/equipo',
     ...all('SELECT slug FROM services WHERE visible = 1').map((r) => '/servicios/' + r.slug),
     ...all('SELECT slug FROM products WHERE visible = 1').map((r) => '/tienda/' + r.slug),
     ...all('SELECT slug FROM projects WHERE visible = 1').map((r) => '/portafolio/' + r.slug),

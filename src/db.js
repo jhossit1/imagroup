@@ -62,6 +62,8 @@ const MIGRATIONS = [
   `ALTER TABLE evaluations ADD COLUMN s_gar INTEGER;
    ALTER TABLE certificates ADD COLUMN ratings TEXT;
    ALTER TABLE badges ADD COLUMN printed TEXT;`,
+  // v0.5: el trabajador puede ocultarse de la página pública Equipo.
+  `ALTER TABLE workers ADD COLUMN public INTEGER DEFAULT 1;`,
 ];
 
 db.exec('CREATE TABLE IF NOT EXISTS _migrations (n INTEGER PRIMARY KEY)');

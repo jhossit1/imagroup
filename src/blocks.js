@@ -3,6 +3,7 @@
 // Los valores vienen del administrador: todo se escapa al dibujar y los enlaces pasan por safeUrl.
 import { h, money, wa, lines, ICON, frame, sm, productCard, shopCard, art, figure, SI, leadForm, safeUrl, mi } from './views.js';
 import { PROFILE } from './profile.js';
+import { teamGrid, teamMethod } from './team.js';
 
 // ---------- Utilidades de texto ----------
 export { safeUrl, mi };
@@ -305,6 +306,25 @@ export const BLOCKS = {
     ${d.fine ? `<p class="pf-fine">${h(d.fine)}</p>` : ''}</div></div></section>`,
   },
 
+  // ======================= Equipo =======================
+  'team-head': {
+    label: 'Portada del equipo', group: 'Equipo', icon: 'hero', desc: 'Título y texto de presentación de la página Equipo.',
+    fields: [{ k: 'title', l: 'Título', t: 'text' }, { k: 'lead', l: 'Texto', t: 'md' }],
+    defaults: () => ({ title: 'Nuestro equipo de obra', lead: 'Notas reales de **puntualidad**, **garantía** y **calidad**, mes a mes.' }),
+    render: (d) => `<section class="wrap tm-head"><h1 class="rise">${mi(d.title)}</h1>${d.lead ? `<div class="lead rise">${md(d.lead)}</div>` : ''}</section>`,
+  },
+  'team-grid': {
+    label: 'Tarjetas del equipo', group: 'Equipo', icon: 'cards', desc: 'Cada trabajador con su foto, nivel, puntaje y estrellas. Los datos salen de Trabajadores.',
+    fields: [{ k: 'title', l: 'Título sobre las tarjetas (opcional)', t: 'text' }, { k: 'show_unrated', l: 'Mostrar también a quienes aún no tienen evaluación aprobada', t: 'bool' }],
+    defaults: () => ({ title: '', show_unrated: true }),
+    render: (d) => teamGrid(d),
+  },
+  'team-method': {
+    label: 'Cómo calificamos', group: 'Equipo', icon: 'list', desc: 'Los criterios y su peso, tomados de la metodología del panel.',
+    fields: [{ k: 'title', l: 'Título', t: 'text' }, { k: 'text', l: 'Texto', t: 'area' }],
+    defaults: () => ({ title: 'Cómo calificamos', text: 'Quien supervisa la obra califica de 1 a 5 cada criterio al cerrar el mes. Cada nota describe una conducta concreta y el administrador aprueba la evaluación antes de publicarla.' }),
+    render: (d) => teamMethod(d),
+  },
   // ======================= Bloques libres =======================
   hero: {
     label: 'Portada', group: 'Bloques libres', icon: 'hero', desc: 'Título grande con imagen, a un lado o de fondo.',

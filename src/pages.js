@@ -23,10 +23,12 @@ export const SYSTEM = {
   portafolio: { slug: 'portafolio', title: 'Ing. Jhossi Tenorio Montenegro · Portafolio', label: 'Portafolio', nav: 3, icon: 'user', desc: 'Portafolio del Ing. Jhossi Tenorio Montenegro, ingeniero ambiental (CIP 285140): trayectoria, especialidades y formación.',
     blocks: () => [B('pf-hero'), B('pf-marquee'), B('pf-spec'), B('pf-jobs'), B('pf-study'), B('pf-gallery'), B('pf-end')] },
   contacto: { slug: 'contacto', title: 'Contacto', nav: 4, icon: 'mail', blocks: () => [B('contact-kinetic'), B('contact-form')] },
+  equipo: { slug: 'equipo', title: 'Nuestro equipo', label: 'Equipo', nav: 5, icon: 'star', desc: 'Calificaciones reales de puntualidad, garantía y calidad de nuestro equipo de obra.',
+    blocks: () => [B('team-head'), B('team-grid'), B('team-method')] },
   carrito: { slug: 'carrito', title: 'Tu pedido', nav: 0, icon: 'bag', blocks: () => [B('cart')] },
 };
 // Direcciones que usa el sistema y no pueden tomar páginas nuevas.
-export const RESERVED = /^(admin|tienda|servicios|portafolio|contacto|carrito|verificar|pedido|img|css|js|uploads|healthz|robots\.txt|sitemap\.xml|p)$/;
+export const RESERVED = /^(admin|equipo|tienda|servicios|portafolio|contacto|carrito|verificar|pedido|img|css|js|uploads|healthz|robots\.txt|sitemap\.xml|p)$/;
 
 for (const [key, p] of Object.entries(SYSTEM)) {
   if (get('SELECT id FROM pages WHERE system = ?', key)) continue;

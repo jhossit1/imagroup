@@ -5,6 +5,7 @@ import { h, money } from './views.js';
 import { CRITERIA, LEVELS, levelOf, evaluate, isTrusted, TRUST_RULE, periodName, rating, N_CRIT } from './method.js';
 import { certificatePdf } from './cert.js';
 import { badgePdf } from './badge.js';
+import { teamPath } from './team.js';
 import QRCode from 'qrcode';
 
 const thisPeriod = () => new Date(Date.now() - 5 * 36e5).toISOString().slice(0, 7);
@@ -119,7 +120,8 @@ export function mountWorkers(r, { shell, ic, csrf }) {
       <div class="w-2"><label>Oficio o especialidad<input name="trade" maxlength="80" value="${h(w.trade)}" placeholder="Operario, maestro de obra, chofer…" data-live="trade"></label>
       <label>Zona u obra<input name="zone" maxlength="80" value="${h(w.zone)}" data-live="zone"></label></div>
       <div class="w-2"><label>Empresa<select name="company_id" data-live-co>${cos.map((c) => `<option value="${c.id}" ${c.id === co.id ? 'selected' : ''}>${h(c.name)}</option>`).join('')}</select></label>
-      <label>Estado<select name="status">${STATUS.map((s) => `<option ${s === (w.status || 'activo') ? 'selected' : ''}>${s}</option>`).join('')}</select></label></div></section>
+      <label>Estado<select name="status">${STATUS.map((s) => `<option ${s === (w.status || 'activo') ? 'selected' : ''}>${s}</option>`).join('')}</select></label></div>
+      <label class="a-check wf-pub"><input type="checkbox" name="public" value="1" ${w.public === 0 ? '' : 'checked'}> Mostrar en la página pública <a href="/equipo" target="_blank" rel="noopener">Equipo</a> con su foto, oficio, calificación y certificados <small>Pide su permiso antes de publicar su foto. Nunca se publican teléfono, observaciones ni bonos.</small></label></section>
     <section class="card wf-s" style="--i:3">${step(4, 'Observaciones', 'Solo las ve el administrador. No registres DNI ni datos de salud.')}
       <label><span class="sr">Observaciones</span><textarea name="notes" rows="3" maxlength="2000">${h(w.notes)}</textarea></label></section>
     <div class="a-actions wf-act"><button class="a-btn">${ic('plus')}${w.id ? 'Guardar cambios' : 'Guardar y ver su ficha'}</button>${w.id ? `<button class="a-btn danger" name="_delete" value="1" data-confirm="¿Eliminar a ${h(w.name)} con todo su historial y certificados? Si solo dejó de trabajar, cambia su estado a inactivo.">Eliminar</button>` : ''}</div></form>
@@ -133,7 +135,7 @@ export function mountWorkers(r, { shell, ic, csrf }) {
     if (!isNew && req.body._delete === '1') { run('DELETE FROM workers WHERE id = ?', w.id); audit(req.admin.username, 'delete', 'workers', w.id, w.name); return res.redirect('/admin/trabajadores'); }
     const b = req.body, v = { name: String(b.name || '').trim().slice(0, 120), trade: String(b.trade || '').trim().slice(0, 80), zone: String(b.zone || '').trim().slice(0, 80),
       phone: String(b.phone || '').replace(/[^\d +]/g, '').slice(0, 20), joined: /^\d{4}-\d{2}-\d{2}$/.test(b.joined) ? b.joined : '',
-      company_id: get('SELECT id FROM companies WHERE id = ?', +b.company_id)?.id || 1, status: STATUS.includes(b.status) ? b.status : 'activo', notes: String(b.notes || '').slice(0, 2000) };
+      company_id: get('SELECT id FROM companies WHERE id = ?', +b.company_id)?.id || 1, status: STATUS.includes(b.status) ? b.status : 'activo', notes: String(b.notes || '').slice(0, 2000), public: b.public === '1' ? 1 : 0 };
     v.photo = req.file ? '/uploads/' + req.file.filename : b.photo_rm ? '' : /^\/uploads\/[a-f0-9]+\.(jpe?g|png)$/.test(b.photo || '') ? b.photo : '';
     if (!v.name) return res.status(400).send(wform(req, { ...v, id: w.id }, 'Escribe el nombre completo.'));
     const keys = Object.keys(v);
@@ -158,9 +160,9 @@ export function mountWorkers(r, { shell, ic, csrf }) {
     const phone = (w.phone || '').replace(/\D/g, ''), wa = phone.length === 9 ? '51' + phone : phone;
     res.send(shell(req, w.name, `<p><a href="/admin/trabajadores">← Trabajadores</a></p>
     <section class="w-prof rise" style="--hue:${HUES[w.id % HUES.length]}">${avatar(w, ' big')}<div class="w-prof-tx"><h1>${h(w.name)}</h1>
-      <p>${h([w.trade, w.zone, co?.name].filter(Boolean).join(' · '))}</p><span class="w-tags"><span class="w-st">${h(w.status)}</span>${last ? chip(last.level) : ''}${trusted ? trustBadge : ''}${w.joined ? `<span class="w-st">desde ${h(w.joined)}</span>` : ''}</span></div>
+      <p>${h([w.trade, w.zone, co?.name].filter(Boolean).join(' · '))}</p><span class="w-tags"><span class="w-st">${h(w.status)}</span>${last ? chip(last.level) : ''}${trusted ? trustBadge : ''}${w.joined ? `<span class="w-st">desde ${h(w.joined)}</span>` : ''}${w.public === 0 || w.status === 'inactivo' ? '<span class="w-st">no sale en la web</span>' : ''}</span></div>
       ${last ? ring(last.score, last.level, ' big') : ''}
-      <div class="w-prof-act"><a class="a-btn" href="/admin/trabajadores/${w.id}/evaluar">${ic('star')}Evaluar mes</a><a class="a-btn ghost" href="/admin/trabajadores/${w.id}/editar">${ic('pen')}Editar</a>${wa ? `<a class="a-btn ghost" href="https://wa.me/${h(wa)}" target="_blank" rel="noopener">${ic('ext')}WhatsApp</a>` : ''}</div></section>
+      <div class="w-prof-act"><a class="a-btn" href="/admin/trabajadores/${w.id}/evaluar">${ic('star')}Evaluar mes</a><a class="a-btn ghost" href="/admin/trabajadores/${w.id}/editar">${ic('pen')}Editar</a>${wa ? `<a class="a-btn ghost" href="https://wa.me/${h(wa)}" target="_blank" rel="noopener">${ic('ext')}WhatsApp</a>` : ''}${w.public !== 0 && w.status !== 'inactivo' ? `<a class="a-btn ghost" href="${teamPath(w)}" target="_blank" rel="noopener">${ic('ext')}Ver en la web</a>` : ''}</div></section>
     <section class="card rise w-rate" style="--i:1"><header><h2>Calificación</h2><a class="a-btn sm" href="/admin/trabajadores/${w.id}/evaluar">${ic('star')}Calificar este mes</a></header>
       ${rt ? `<div class="w-rate-g">${rt.map((r, i) => `<div class="w-rate-c" style="--cc:${r.c};--i:${i}"><span class="w-rate-t">${h(r.t)}</span>${stars(r.v, r.c, i)}<b>${r.v ? num(r.v) : '—'}<small> / 5</small></b></div>`).join('')}</div>
         <p class="a-help">Promedio de sus últimas evaluaciones aprobadas (hasta tres meses). Sale en su certificado y en su carné.</p>`

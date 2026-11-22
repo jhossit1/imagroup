@@ -238,3 +238,18 @@
     io.observe(typed);
   }
 })();
+
+// Equipo: filtrar las tarjetas por oficio con una entrada en cascada.
+document.querySelectorAll('[data-team]').forEach((sec) => {
+  const chips = sec.querySelectorAll('[data-trade]:is(button)'), cards = sec.querySelectorAll('.tm-card');
+  chips.forEach((b) => b.addEventListener('click', () => {
+    chips.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    let n = 0;
+    const run = () => cards.forEach((c) => {
+      const show = !b.dataset.trade || c.dataset.trade === b.dataset.trade;
+      c.classList.toggle('out', !show);
+      if (show) { c.style.setProperty('--i', Math.min(n++, 10)); c.style.animation = 'none'; void c.offsetWidth; c.style.animation = ''; }
+    });
+    document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches ? document.startViewTransition(run).finished.catch(() => {}) : run();
+  }));
+});

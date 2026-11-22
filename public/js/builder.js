@@ -262,7 +262,7 @@
   // ----- Paleta de bloques -----
   const pal = $('[data-palette]'), palList = $('[data-pal-list]'), palQ = $('[data-pal-q]');
   let insertAt = 0;
-  const ORDER = ['Bloques libres', 'Inicio', 'Servicios', 'Tienda', 'Contacto', 'Portafolio'];
+  const ORDER = ['Bloques libres', 'Inicio', 'Servicios', 'Tienda', 'Contacto', 'Portafolio', 'Equipo'];
   function drawPalette() {
     const q = palQ.value.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
     const groups = ORDER.map((g) => [g, Object.entries(T).filter(([, t]) => t.group === g && (!q || (t.label + ' ' + t.desc).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes(q)))]).filter(([, a]) => a.length);

@@ -44,7 +44,7 @@ export function layout(s, { title, desc, path = '/', body, theme = '', preview =
 ${s.review_banner === '1' ? '<meta name="robots" content="noindex">' : ''}
 <link rel="icon" href="/img/brand/imagroup.webp"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/site.css?v=14"><link rel="stylesheet" href="/css/blocks.css?v=1">${theme === 'shop' ? '<link rel="stylesheet" href="/css/shop.css?v=4"><script src="/js/shop.js?v=3" defer></script>' : ''}<script src="/js/theme.js?v=7"></script></head>
+<link rel="stylesheet" href="/css/site.css?v=16"><link rel="stylesheet" href="/css/blocks.css?v=1">${theme === 'shop' ? '<link rel="stylesheet" href="/css/shop.css?v=4"><script src="/js/shop.js?v=3" defer></script>' : ''}<script src="/js/theme.js?v=7"></script></head>
 <body class="${theme}">
 <a class="skip" href="#main">Saltar al contenido</a>
 ${s.review_banner === '1' ? '<div class="review">Versión de revisión. Los pagos en línea aún no están habilitados: los pedidos se confirman por WhatsApp o teléfono.</div>' : ''}
@@ -70,7 +70,7 @@ ${s.review_banner === '1' ? '<div class="review">Versión de revisión. Los pago
   <p class="fine">© ${new Date().getFullYear()} Imagroup S.A.C. ${s.facebook ? `· <a href="${h(s.facebook)}" rel="noopener">Facebook</a>` : ''}</p>
 </div></footer>
 <a class="wa-float" href="${wa(s.whatsapp, s.wa_float || 'Hola, vengo de la web de Imagroup.')}" target="_blank" rel="noopener" aria-label="Escribir por WhatsApp">${ICON.wa}</a>
-<script src="/js/site.js?v=12" defer></script>${preview}</body></html>`;
+<script src="/js/site.js?v=13" defer></script>${preview}</body></html>`;
 }
 
 export const frame = (src, alt, cls = '', eager = false) =>
