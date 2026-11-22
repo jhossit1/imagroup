@@ -2,7 +2,7 @@
 import crypto from 'node:crypto';
 import { all, get, run, audit, settings } from './db.js';
 import { h, money } from './views.js';
-import { CRITERIA, LEVELS, levelOf, evaluate, isTrusted, TRUST_RULE, periodName } from './method.js';
+import { CRITERIA, LEVELS, levelOf, evaluate, isTrusted, TRUST_RULE, periodName, rating, N_CRIT } from './method.js';
 import { certificatePdf } from './cert.js';
 import { badgePdf } from './badge.js';
 import QRCode from 'qrcode';
@@ -18,6 +18,24 @@ const dmy = (iso) => String(iso).slice(0, 10).split('-').reverse().join('/');
 const baseUrl = (req) => `${req.get('x-forwarded-proto') === 'https' ? 'https' : req.protocol}://${req.get('host')}`;
 const ring = (score, lv, size = '') => `<span class="w-ring${size}" style="--p:${score || 0};--lc:${levelOf(lv).c}"><svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="16" pathLength="100"/><circle cx="20" cy="20" r="16" pathLength="100"/></svg><b>${score == null ? '—' : Math.round(score)}</b></span>`;
 const chip = (lv) => { const l = levelOf(lv); return `<span class="w-lv lv-${l.k}">${h(l.t)}</span>`; };
+const num = (v) => String(v).replace('.', ',');
+export const stars = (v, c = '#c9a24a', i = 0) => `<span class="w-stars" role="img" aria-label="${v ? num(v) + ' de 5' : 'Sin calificar'}" style="--f:${(v || 0) * 20}%;--sc:${c};--i:${i}"></span>`;
+// Datos que lleva impresos el carné: si cambian, el panel avisa que conviene reimprimirlo.
+const PRINT = { name: 'nombre', trade: 'oficio', zone: 'zona', photo: 'foto', rt: 'calificación', trusted: 'reconocimiento de confianza' };
+const printSig = (w, rt, trusted) => JSON.stringify({ name: w.name, trade: w.trade || '', zone: w.zone || '', photo: w.photo || '', rt: (rt || []).map((r) => r.v), trusted: !!trusted });
+const changed = (a, b) => { try { const x = JSON.parse(a), y = JSON.parse(b); return Object.keys(PRINT).filter((k) => JSON.stringify(x[k]) !== JSON.stringify(y[k])).map((k) => PRINT[k]); } catch { return []; } };
+const listEs = (a) => (a.length > 1 ? a.slice(0, -1).join(', ') + ' y ' + a.at(-1) : a[0] || '');
+// Carné en pantalla: el mismo diseño se usa en la ficha y, en vivo, mientras se llena el formulario.
+const cardHtml = (req, w, co, active, trusted, rt) => `<div class="bc-wrap"><button type="button" class="bc" data-flip aria-label="Girar el carné para ver el reverso">
+  <span class="bc-face bc-front"><span class="bc-head"><img src="${h(co.logo || '/img/brand/imagroup.webp')}" alt=""><span><b data-out="company">${h(co.name || '')}</b><small>Carné de identificación</small></span></span>
+    <span class="bc-photo" data-out-photo>${w.photo ? `<img src="${h(w.photo)}" alt="">` : `<span style="--hue:${HUES[(w.id || 0) % HUES.length]}" data-out="initials">${h(initials(w.name || '?'))}</span>`}</span>
+    ${trusted ? '<span class="bc-trust">Trabajador de confianza</span>' : ''}
+    <b class="bc-name" data-out="name">${h(w.name || 'Nombre del trabajador')}</b><span class="bc-trade" data-out="trade">${h(w.trade || '')}</span><small class="bc-zone" data-out="zone">${h(w.zone || '')}</small>
+    ${rt ? `<span class="bc-rate">${rt.map((r, i) => `<span><small>${h(r.t)}</small>${stars(r.v, '#c9a24a', i)}</span>`).join('')}</span>` : '<span class="bc-rate bc-norate">Calificación al evaluar su primer mes</span>'}
+    <span class="bc-foot"><span><small>N.° de carné</small>${active ? h(active.code) : '—'}<small>Válido hasta</small>${active ? dmy(active.expires) : '—'}</span><span class="bc-qr">${active ? qrSvg(`${baseUrl(req)}/verificar/${active.code}`) : ''}</span></span></span>
+  <span class="bc-face bc-back"><span class="bc-stripe"></span><b>Verifique este carné</b><span class="bc-bigqr">${active ? qrSvg(`${baseUrl(req)}/verificar/${active.code}`) : '<em>El QR se crea al generar el carné</em>'}</span>
+    <small>Escanee el código con la cámara del celular para comprobar que este carné es válido y que la persona trabaja con nosotros.</small><span class="bc-sign">${h(co.signer_name || co.signer_role || 'Gerencia General')}</span></span>
+</button><p class="a-help bc-tip">Toca el carné para girarlo.</p></div>`;
 const trustBadge = '<span class="w-trust" title="' + h(TRUST_RULE) + '">★ De confianza</span>';
 
 export function monthStar() {
@@ -67,7 +85,7 @@ export function mountWorkers(r, { shell, ic, csrf }) {
   r.get('/trabajadores/metodologia', (req, res) => {
     const s = settings();
     res.send(shell(req, 'Metodología', `<p><a href="/admin/trabajadores">← Trabajadores</a></p><div class="a-head"><div><p class="d-eye">Cómo se reconoce a un buen trabajador</p><h1 class="grad">Metodología de reconocimiento</h1></div></div>
-    <section class="card m-intro rise"><p>Usamos una <b>escala de calificación anclada en conductas</b> (BARS): cada mes, quien supervisa califica de 1 a 5 seis criterios. Cada nota describe una conducta observable en obra, así dos supervisores califican igual. Los criterios tienen un peso y suman <b>100 puntos</b>.</p>
+    <section class="card m-intro rise"><p>Usamos una <b>escala de calificación anclada en conductas</b> (BARS): cada mes, quien supervisa califica de 1 a 5 ${N_CRIT} criterios. Cada nota describe una conducta observable en obra, así dos supervisores califican igual. Los criterios tienen un peso y suman <b>100 puntos</b>.</p>
     <ol class="m-steps"><li><b>Evalúa</b> al cierre del mes con una nota justificada.</li><li><b>Revisa</b> el nivel y bono que propone el sistema.</li><li><b>Aprueba</b> o revoca: tú decides, nada es automático.</li><li><b>Reconoce</b> con un certificado verificable por QR.</li></ol></section>
     <div class="m-grid">${CRITERIA.map((c, i) => `<section class="card m-crit rise" style="--i:${i};--cc:${c.c}"><header><h2>${h(c.t)}</h2><span class="m-w">${c.w}%</span></header><p class="a-help">${h(c.d)}</p>
       <span class="m-bar"><i style="width:${c.w * 4}%"></i></span><ol class="m-anch">${c.a.map((a, n) => `<li><b>${n + 1}</b>${h(a)}</li>`).join('')}</ol></section>`).join('')}</div>
@@ -82,21 +100,32 @@ export function mountWorkers(r, { shell, ic, csrf }) {
   });
 
   // ---- Alta y edición ----
-  const wform = (req, w, err = '') => shell(req, w.id ? 'Editar trabajador' : 'Nuevo trabajador', `<p><a href="/admin/trabajadores${w.id ? '/' + w.id : ''}">← ${w.id ? h(w.name) : 'Trabajadores'}</a></p>
+  const wform = (req, w, err = '') => {
+    const cos = all('SELECT id, name, logo, signer_name, signer_role FROM companies ORDER BY sort'), co = cos.find((c) => c.id === (w.company_id || 1)) || cos[0] || {};
+    const evs = w.id ? all('SELECT * FROM evaluations WHERE worker_id = ?', w.id) : [], active = w.id ? get('SELECT * FROM badges WHERE worker_id = ? AND revoked_at IS NULL ORDER BY id DESC', w.id) : null;
+    const step = (n, t, d) => `<header class="wf-h"><span class="wf-n">${n}</span><span><b>${t}</b><small>${d}</small></span></header>`;
+    return shell(req, w.id ? 'Editar trabajador' : 'Nuevo trabajador', `<p><a href="/admin/trabajadores${w.id ? '/' + w.id : ''}">← ${w.id ? h(w.name) : 'Trabajadores'}</a></p>
     <h1 class="grad">${w.id ? 'Editar ficha' : 'Nuevo trabajador'}</h1>${err ? `<p class="a-err" role="alert">${h(err)}</p>` : ''}
-    <form class="a-card a-form w-form" method="post" enctype="multipart/form-data" action="/admin/trabajadores/${w.id || 'nuevo'}">${csrf(req)}
-    <label>Nombre completo<input name="name" required maxlength="120" value="${h(w.name)}" autocomplete="off"></label>
-    <div class="w-photo">${w.photo ? `<img src="${h(w.photo)}" alt="">` : `<span class="w-photo-ph">${ic('users')}</span>`}<input type="hidden" name="photo" value="${h(w.photo)}">
-      <label>Foto para el carné <small>(opcional) JPG o PNG, de frente y con fondo claro. Máx. 4 MB.</small><input type="file" name="photo__file" accept="image/jpeg,image/png"></label>
-      ${w.photo ? '<label class="a-check"><input type="checkbox" name="photo_rm" value="1"> Quitar foto</label>' : ''}</div>
-    <div class="w-2"><label>Oficio o especialidad<input name="trade" maxlength="80" value="${h(w.trade)}" placeholder="Operario, maestro de obra, chofer…"></label>
-    <label>Zona u obra<input name="zone" maxlength="80" value="${h(w.zone)}"></label></div>
-    <div class="w-2"><label>Teléfono <small>(opcional)</small><input name="phone" inputmode="tel" maxlength="20" value="${h(w.phone)}"></label>
-    <label>Fecha de incorporación<input name="joined" type="date" value="${h(w.joined)}"></label></div>
-    <div class="w-2"><label>Empresa<select name="company_id">${all('SELECT id, name FROM companies ORDER BY sort').map((c) => `<option value="${c.id}" ${c.id === (w.company_id || 1) ? 'selected' : ''}>${h(c.name)}</option>`).join('')}</select></label>
-    <label>Estado<select name="status">${STATUS.map((s) => `<option ${s === (w.status || 'activo') ? 'selected' : ''}>${s}</option>`).join('')}</select></label></div>
-    <label>Observaciones<textarea name="notes" rows="3" maxlength="2000">${h(w.notes)}</textarea><small>No registres DNI ni datos de salud.</small></label>
-    <div class="a-actions"><button class="a-btn">${ic('plus')}Guardar ficha</button>${w.id ? `<button class="a-btn danger" name="_delete" value="1" data-confirm="¿Eliminar a ${h(w.name)} con todo su historial y certificados? Si solo dejó de trabajar, cambia su estado a inactivo.">Eliminar</button>` : ''}</div></form>`);
+    <div class="wf" data-wform data-cos='${h(JSON.stringify(Object.fromEntries(cos.map((c) => [c.id, c.name]))))}'>
+    <form class="a-form w-form" method="post" enctype="multipart/form-data" action="/admin/trabajadores/${w.id || 'nuevo'}">${csrf(req)}
+    <section class="card wf-s" style="--i:0">${step(1, 'Quién es', 'El nombre sale tal cual en el carné y en los certificados.')}
+      <label>Nombre completo<input name="name" required maxlength="120" value="${h(w.name)}" autocomplete="off" data-live="name" placeholder="Ej.: Juan Pérez Quispe"></label>
+      <div class="w-2"><label>Teléfono <small>(opcional)</small><input name="phone" inputmode="tel" maxlength="20" value="${h(w.phone)}"></label>
+      <label>Fecha de incorporación<input name="joined" type="date" value="${h(w.joined)}"></label></div></section>
+    <section class="card wf-s" style="--i:1">${step(2, 'Foto para el carné', 'Opcional. De frente, con fondo claro. JPG o PNG de hasta 4 MB.')}
+      <div class="w-photo"><label class="wf-drop" data-drop>${w.photo ? `<img src="${h(w.photo)}" alt="">` : `<span class="w-photo-ph">${ic('users')}</span>`}<span><b>${w.photo ? 'Cambiar foto' : 'Elegir foto'}</b><small>Toca aquí o arrastra la imagen</small></span><input type="file" name="photo__file" accept="image/jpeg,image/png" data-live-photo></label><input type="hidden" name="photo" value="${h(w.photo)}">
+      ${w.photo ? '<label class="a-check"><input type="checkbox" name="photo_rm" value="1" data-live-rm> Quitar foto</label>' : ''}</div></section>
+    <section class="card wf-s" style="--i:2">${step(3, 'Su trabajo', 'Oficio y zona salen en el carné. El estado decide si aparece como disponible.')}
+      <div class="w-2"><label>Oficio o especialidad<input name="trade" maxlength="80" value="${h(w.trade)}" placeholder="Operario, maestro de obra, chofer…" data-live="trade"></label>
+      <label>Zona u obra<input name="zone" maxlength="80" value="${h(w.zone)}" data-live="zone"></label></div>
+      <div class="w-2"><label>Empresa<select name="company_id" data-live-co>${cos.map((c) => `<option value="${c.id}" ${c.id === co.id ? 'selected' : ''}>${h(c.name)}</option>`).join('')}</select></label>
+      <label>Estado<select name="status">${STATUS.map((s) => `<option ${s === (w.status || 'activo') ? 'selected' : ''}>${s}</option>`).join('')}</select></label></div></section>
+    <section class="card wf-s" style="--i:3">${step(4, 'Observaciones', 'Solo las ve el administrador. No registres DNI ni datos de salud.')}
+      <label><span class="sr">Observaciones</span><textarea name="notes" rows="3" maxlength="2000">${h(w.notes)}</textarea></label></section>
+    <div class="a-actions wf-act"><button class="a-btn">${ic('plus')}${w.id ? 'Guardar cambios' : 'Guardar y ver su ficha'}</button>${w.id ? `<button class="a-btn danger" name="_delete" value="1" data-confirm="¿Eliminar a ${h(w.name)} con todo su historial y certificados? Si solo dejó de trabajar, cambia su estado a inactivo.">Eliminar</button>` : ''}</div></form>
+    <aside class="wf-prev"><p class="wf-prev-t">Así se verá su carné</p>${cardHtml(req, w, co, active, w.id && isTrusted(evs), w.id ? rating(evs) : null)}
+      <p class="a-help">${w.id ? 'Al guardar, el carné y su QR toman estos datos. Las estrellas salen de sus evaluaciones.' : 'Después de guardar podrás calificar su puntualidad, garantía y calidad, y generar el carné con QR.'}</p></aside></div>`);
+  };
   r.get('/trabajadores/nuevo', (req, res) => res.send(wform(req, {})));
   r.get('/trabajadores/:id/editar', (req, res, next) => { const w = load(req.params.id); return w ? res.send(wform(req, w)) : next(); });
   r.post('/trabajadores/:id', (req, res, next) => {
@@ -124,18 +153,23 @@ export function mountWorkers(r, { shell, ic, csrf }) {
     const nextYear = new Date(Date.now() + 365 * 864e5).toISOString().slice(0, 10);
     const co = get('SELECT name FROM companies WHERE id = ?', w.company_id);
     const last = evs[0], trusted = isTrusted(evs), approved = evs.filter((e) => e.status === 'aprobado');
-    const hist = evs.slice(0, 12).reverse();
+    const hist = evs.slice(0, 12).reverse(), rt = rating(evs), sig = printSig(w, rt, trusted);
+    const stale = active?.printed && active.printed !== sig ? changed(active.printed, sig) : [];
     const phone = (w.phone || '').replace(/\D/g, ''), wa = phone.length === 9 ? '51' + phone : phone;
     res.send(shell(req, w.name, `<p><a href="/admin/trabajadores">← Trabajadores</a></p>
     <section class="w-prof rise" style="--hue:${HUES[w.id % HUES.length]}">${avatar(w, ' big')}<div class="w-prof-tx"><h1>${h(w.name)}</h1>
       <p>${h([w.trade, w.zone, co?.name].filter(Boolean).join(' · '))}</p><span class="w-tags"><span class="w-st">${h(w.status)}</span>${last ? chip(last.level) : ''}${trusted ? trustBadge : ''}${w.joined ? `<span class="w-st">desde ${h(w.joined)}</span>` : ''}</span></div>
       ${last ? ring(last.score, last.level, ' big') : ''}
       <div class="w-prof-act"><a class="a-btn" href="/admin/trabajadores/${w.id}/evaluar">${ic('star')}Evaluar mes</a><a class="a-btn ghost" href="/admin/trabajadores/${w.id}/editar">${ic('pen')}Editar</a>${wa ? `<a class="a-btn ghost" href="https://wa.me/${h(wa)}" target="_blank" rel="noopener">${ic('ext')}WhatsApp</a>` : ''}</div></section>
+    <section class="card rise w-rate" style="--i:1"><header><h2>Calificación</h2><a class="a-btn sm" href="/admin/trabajadores/${w.id}/evaluar">${ic('star')}Calificar este mes</a></header>
+      ${rt ? `<div class="w-rate-g">${rt.map((r, i) => `<div class="w-rate-c" style="--cc:${r.c};--i:${i}"><span class="w-rate-t">${h(r.t)}</span>${stars(r.v, r.c, i)}<b>${r.v ? num(r.v) : '—'}<small> / 5</small></b></div>`).join('')}</div>
+        <p class="a-help">Promedio de sus últimas evaluaciones aprobadas (hasta tres meses). Sale en su certificado y en su carné.</p>`
+      : `<div class="w-rate-empty"><span class="w-stars big" style="--f:0%"></span><p>Califica su <b>puntualidad</b>, la <b>garantía</b> de su trabajo y su <b>calidad</b> al cerrar el mes. Al aprobar la evaluación, las estrellas aparecen aquí, en su certificado y en su carné.</p></div>`}</section>
     <div class="a-cols">
-      <section class="card rise" style="--i:1"><header><h2>Historial de puntaje</h2><span class="d-tag">${evs.length} meses</span></header>
+      <section class="card rise" style="--i:2"><header><h2>Historial de puntaje</h2><span class="d-tag">${evs.length} meses</span></header>
         ${hist.length ? `<div class="w-hist">${hist.map((e, i) => `<span style="--h:${Math.max(4, e.score)};--i:${i};--lc:${levelOf(e.level).c}" class="${e.status}" title="${h(periodName(e.period))}: ${e.score} (${h(e.status)})"><b>${Math.round(e.score)}</b><i></i><small>${h(e.period.slice(5))}/${h(e.period.slice(2, 4))}</small></span>`).join('')}</div>` : '<p class="d-empty">Sin evaluaciones todavía.</p>'}</section>
       <section class="card rise" style="--i:2"><header><h2>Última evaluación</h2>${last ? `<span class="d-tag">${h(periodName(last.period))}</span>` : ''}</header>
-        ${last ? `<ul class="w-crit">${CRITERIA.map((c, i) => `<li style="--cc:${c.c};--v:${last[c.k] * 20};--i:${i}"><span>${h(c.t)}</span><span class="w-cb"><i></i></span><b>${last[c.k]}/5</b></li>`).join('')}</ul>` : `<p class="d-empty">Evalúa su primer mes para ver sus fortalezas.</p>`}</section></div>
+        ${last ? `<ul class="w-crit">${CRITERIA.map((c, i) => `<li style="--cc:${c.c};--v:${(last[c.k] || 0) * 20};--i:${i}"><span>${h(c.t)}</span><span class="w-cb"><i></i></span><b>${last[c.k] ? last[c.k] + '/5' : '—'}</b></li>`).join('')}</ul>` : `<p class="d-empty">Evalúa su primer mes para ver sus fortalezas.</p>`}</section></div>
     <section class="card rise" style="--i:3"><header><h2>Evaluaciones y bonos</h2><a class="a-btn ghost" href="/admin/trabajadores/${w.id}/evaluar">${ic('plus')}Nueva</a></header>
       ${evs.length ? `<ul class="w-evs">${evs.map((e) => `<li class="ev-${e.status}"><span class="w-ev-p"><b>${h(periodName(e.period))}</b><small>${h(e.project || 'Sin obra indicada')}${e.days ? ` · ${e.days} días` : ''}</small></span>
         ${ring(e.score, e.level)}${chip(e.level)}<span class="w-ev-b">${e.bonus_cents ? money(e.bonus_cents) : 'Sin bono'}</span><span class="a-pill s-${e.status === 'aprobado' ? 'confirmado' : e.status === 'propuesto' ? 'nuevo' : 'descartado'}">${h(e.status)}</span>
@@ -143,15 +177,8 @@ export function mountWorkers(r, { shell, ic, csrf }) {
         ${e.status !== 'revocado' ? `<details class="w-rev"><summary>Revocar</summary><form method="post" action="/admin/evaluaciones/${e.id}/revocar">${csrf(req)}<input name="reason" required maxlength="300" placeholder="Motivo de la revocación"><button class="a-btn danger sm">Confirmar</button></form></details>` : `<small class="a-muted">${h(e.revoke_reason || '')}</small>`}</span>
         <p class="w-ev-r">${h(e.reason || '')} <small>— ${h(e.evaluator || '')}${e.decided_by ? `, ${h(e.status)} por ${h(e.decided_by)}` : ''}</small></p></li>`).join('')}</ul>` : '<p class="d-empty">Todavía no hay evaluaciones.</p>'}</section>
     <section class="card rise w-badge" style="--i:4" id="carne"><header><h2>Carné de identificación</h2>${active ? `<span class="a-pill s-confirmado">vigente hasta ${dmy(active.expires)}</span>` : '<span class="a-pill s-nuevo">sin carné vigente</span>'}</header>
-      <div class="bc-wrap"><button type="button" class="bc" data-flip aria-label="Girar el carné para ver el reverso">
-        <span class="bc-face bc-front"><span class="bc-head"><img src="${h(coFull.logo || '/img/brand/imagroup.webp')}" alt=""><span><b>${h(coFull.name || '')}</b><small>Carné de identificación</small></span></span>
-          <span class="bc-photo">${w.photo ? `<img src="${h(w.photo)}" alt="">` : `<span style="--hue:${HUES[w.id % HUES.length]}">${h(initials(w.name))}</span>`}</span>
-          <b class="bc-name">${h(w.name)}</b>${w.trade ? `<span class="bc-trade">${h(w.trade)}</span>` : ''}${w.zone ? `<small class="bc-zone">${h(w.zone)}</small>` : ''}${trusted ? '<span class="bc-trust">Trabajador de confianza</span>' : ''}
-          <span class="bc-foot"><span><small>N.° de carné</small>${active ? h(active.code) : '—'}<small>Válido hasta</small>${active ? dmy(active.expires) : '—'}</span><span class="bc-qr">${active ? qrSvg(`${baseUrl(req)}/verificar/${active.code}`) : ''}</span></span></span>
-        <span class="bc-face bc-back"><span class="bc-stripe"></span><b>Verifique este carné</b><span class="bc-bigqr">${active ? qrSvg(`${baseUrl(req)}/verificar/${active.code}`) : '<em>Genera el carné para crear su QR</em>'}</span>
-          <small>Escanee el código con la cámara del celular para comprobar que este carné es válido y que la persona trabaja con nosotros.</small><span class="bc-sign">${h(coFull.signer_name || coFull.signer_role || 'Gerencia General')}</span></span>
-      </button><p class="a-help bc-tip">Toca el carné para girarlo.</p></div>
-      <div class="bc-side"><ol class="bc-steps"><li><b>Genera</b> el carné con su fecha de vencimiento.</li><li><b>Imprime</b> la hoja A4 a tamaño real o lleva el PDF tamaño tarjeta a una imprenta de fotochecks.</li><li><b>Recorta, pega y plastifica.</b> El trabajador lo lleva visible en obra.</li><li><b>Cualquiera lo verifica</b> escaneando el QR: verá si está vigente.</li></ol>
+      ${cardHtml(req, w, coFull, active, trusted, rt)}
+      <div class="bc-side">${stale.length ? `<p class="bc-stale" role="status">${ic('pen')}<span>Cambió ${h(listEs(stale))} desde la última descarga. <b>Descarga el PDF otra vez</b> para imprimir el carné al día. El QR ya muestra los datos nuevos.</span></p>` : active ? `<p class="bc-live">El carné toma siempre los datos actuales de la ficha: cada descarga sale al día.</p>` : ''}<ol class="bc-steps"><li><b>Genera</b> el carné con su fecha de vencimiento.</li><li><b>Imprime</b> la hoja A4 a tamaño real o lleva el PDF tamaño tarjeta a una imprenta de fotochecks.</li><li><b>Recorta, pega y plastifica.</b> El trabajador lo lleva visible en obra.</li><li><b>Cualquiera lo verifica</b> escaneando el QR: verá si está vigente.</li></ol>
         <form class="w-issue bc-form" method="post" action="/admin/trabajadores/${w.id}/carne">${csrf(req)}<label>Válido hasta<input type="date" name="expires" required value="${nextYear}" min="${today()}"></label>
           <button class="a-btn" ${active ? `data-confirm="Se anulará el carné ${h(active.code)} y se creará uno nuevo. ¿Continuar?"` : ''}>${ic('plus')}${active ? 'Reemplazar carné' : 'Generar carné'}</button></form>
         ${w.photo ? '' : `<p class="a-help">Sin foto, el carné muestra sus iniciales. <a href="/admin/trabajadores/${w.id}/editar">Agregar foto</a></p>`}
@@ -183,12 +210,12 @@ export function mountWorkers(r, { shell, ic, csrf }) {
     ${err ? `<p class="a-err" role="alert">${h(err)}</p>` : ''}
     <form class="ev" method="post" action="/admin/trabajadores/${w.id}/evaluar" data-eval data-bonos='${h(JSON.stringify({ oro: s.bono_oro, plata: s.bono_plata, bronce: s.bono_bronce }))}'>${csrf(req)}
     <div class="ev-main"><section class="card w-2 ev-meta"><label>Mes evaluado<input type="month" name="period" required value="${h(e.period)}"></label><label>Obra o proyecto<input name="project" maxlength="120" value="${h(e.project)}"></label><label>Días trabajados<input type="number" name="days" min="0" max="31" value="${h(e.days)}"></label></section>
-    ${CRITERIA.map((c, i) => `<fieldset class="card ev-c rise" style="--i:${i};--cc:${c.c}" data-w="${c.w}" data-k="${c.k}"><legend><b>${h(c.t)}</b><span class="m-w">${c.w}%</span></legend><p class="a-help">${h(c.d)}</p>
+    ${CRITERIA.map((c, i) => `<fieldset class="card ev-c rise" style="--i:${i};--cc:${c.c}" data-w="${c.w}" data-k="${c.k}"><legend><b>${h(c.t)}${['s_pun', 's_gar', 's_cal'].includes(c.k) ? '<span class="ev-key">Sale en certificado y carné</span>' : ''}</b><span class="m-w">${c.w}%</span></legend><p class="a-help">${h(c.d)}</p>
       <div class="ev-pick">${[1, 2, 3, 4, 5].map((n) => `<label><input type="radio" name="${c.k}" value="${n}" required ${+e[c.k] === n ? 'checked' : ''}><span>${n}</span></label>`).join('')}</div>
       <ol class="ev-anch">${c.a.map((a) => `<li>${h(a)}</li>`).join('')}</ol></fieldset>`).join('')}
     <section class="card"><label>Justificación<textarea name="reason" rows="3" required maxlength="1000" placeholder="Hechos concretos del mes: qué hizo bien, qué debe mejorar.">${h(e.reason)}</textarea></label></section></div>
     <aside class="card ev-prev"><p class="d-eye">Resultado propuesto</p><span class="w-ring huge" data-ring style="--p:0;--lc:#5d6874"><svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="16" pathLength="100"/><circle cx="20" cy="20" r="16" pathLength="100"/></svg><b data-score>0</b></span>
-      <b class="ev-lv" data-level>Completa los 6 criterios</b><span class="ev-bono" data-bono></span><p class="ev-gate" data-gate hidden>Seguridad menor a 3: sin nivel ni bono.</p>
+      <b class="ev-lv" data-level>Completa los ${N_CRIT} criterios</b><span class="ev-bono" data-bono></span><p class="ev-gate" data-gate hidden>Seguridad menor a 3: sin nivel ni bono.</p>
       <ul class="ev-mini">${CRITERIA.map((c) => `<li style="--cc:${c.c}" data-mini="${c.k}"><span>${h(c.t)}</span><i></i></li>`).join('')}</ul>
       <button class="a-btn" name="approve" value="1">${ic('star')}Guardar y aprobar</button><button class="a-btn ghost" name="approve" value="0">Guardar como propuesta</button>
       <p class="a-help">Tú decides: el sistema solo propone nivel y bono.</p></aside></form>`;
@@ -199,7 +226,7 @@ export function mountWorkers(r, { shell, ic, csrf }) {
     for (const c of CRITERIA) sc[c.k] = Math.min(5, Math.max(1, parseInt(b[c.k], 10) || 0));
     const period = /^\d{4}-\d{2}$/.test(b.period) ? b.period : '';
     const reason = String(b.reason || '').trim().slice(0, 1000);
-    if (!period || CRITERIA.some((c) => !+b[c.k]) || !reason) return res.status(400).send(shell(req, 'Evaluar', evalForm(req, w, { ...b, ...sc }, 'Completa el mes, los seis criterios y la justificación.')));
+    if (!period || CRITERIA.some((c) => !+b[c.k]) || !reason) return res.status(400).send(shell(req, 'Evaluar', evalForm(req, w, { ...b, ...sc }, 'Completa el mes, los ${N_CRIT} criterios y la justificación.')));
     const r0 = evaluate(sc, settings()), ok = b.approve === '1';
     const vals = [b.project ? String(b.project).slice(0, 120) : '', parseInt(b.days, 10) || null, ...CRITERIA.map((c) => sc[c.k]), r0.score, r0.level, r0.bonus_cents, ok ? 'aprobado' : 'propuesto', reason, req.admin.username, ok ? req.admin.username : null, ok ? new Date().toISOString() : null];
     run(`INSERT INTO evaluations (worker_id, period, project, days, ${CRITERIA.map((c) => c.k)}, score, level, bonus_cents, status, reason, evaluator, decided_by, decided_at) VALUES (?, ?, ?, ?, ${CRITERIA.map(() => '?')}, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -226,10 +253,11 @@ export function mountWorkers(r, { shell, ic, csrf }) {
     const lv = ev ? levelOf(ev.level) : null;
     const title = kind === 'excelencia' ? 'Reconocimiento a la Excelencia' : 'Trabajador de Confianza';
     const body = kind === 'excelencia'
-      ? `Por su desempeño de máxima calidad y rendimiento en ${periodName(ev.period)}${ev.project ? `, en ${ev.project}` : ''}, con una calificación de ${Math.round(ev.score)} de 100 puntos (nivel ${lv.t} · ${lv.name}) según la metodología de evaluación de ${co.name}, que acredita su compromiso con la seguridad, la calidad, la puntualidad y el trabajo en equipo.`
-      : `Por demostrar responsabilidad, honestidad y compromiso con la seguridad y la calidad en las obras de ${co.name}${w.trade ? ` como ${w.trade.toLowerCase()}` : ''}${w.joined ? `, desde ${periodName(w.joined.slice(0, 7))}` : ''}${ev ? `, con una evaluación de ${Math.round(ev.score)} de 100 puntos en ${periodName(ev.period)}` : ''}. Se le acredita como trabajador de confianza de la empresa.`;
+      ? `Por su desempeño de máxima calidad y rendimiento en ${periodName(ev.period)}${ev.project ? `, en ${ev.project}` : ''}, con una calificación de ${Math.round(ev.score)} de 100 puntos (nivel ${lv.t} · ${lv.name}) según la metodología de evaluación de ${co.name}, que acredita su puntualidad, la garantía y la calidad de su trabajo, y su compromiso con la seguridad.`
+      : `Por demostrar puntualidad, responsabilidad y compromiso con la garantía y la calidad de su trabajo en las obras de ${co.name}${w.trade ? ` como ${w.trade.toLowerCase()}` : ''}${w.joined ? `, desde ${periodName(w.joined.slice(0, 7))}` : ''}${ev ? `, con una evaluación de ${Math.round(ev.score)} de 100 puntos en ${periodName(ev.period)}` : ''}. Se le acredita como trabajador de confianza de la empresa.`;
     const code = crypto.randomBytes(5).toString('hex').toUpperCase().replace(/(.{5})/, '$1-');
-    run('INSERT INTO certificates (code, worker_id, evaluation_id, kind, title, body, company_id, issued_by) VALUES (?,?,?,?,?,?,?,?)', code, w.id, ev?.id ?? null, kind, title, body, co.id, req.admin.username);
+    const rt = rating(all('SELECT * FROM evaluations WHERE worker_id = ?', w.id));
+    run('INSERT INTO certificates (code, worker_id, evaluation_id, kind, title, body, company_id, issued_by, ratings) VALUES (?,?,?,?,?,?,?,?,?)', code, w.id, ev?.id ?? null, kind, title, body, co.id, req.admin.username, rt ? JSON.stringify(rt) : null);
     audit(req.admin.username, 'certificate', 'workers', w.id, `${code} ${title}`);
     res.redirect('/admin/trabajadores/' + w.id + '#cert-' + code);
   });
@@ -255,9 +283,10 @@ export function mountWorkers(r, { shell, ic, csrf }) {
     const m = /^([A-F0-9]{5}-[A-F0-9]{5})\.pdf$/.exec(req.params.file); if (!m) return next();
     const b = get('SELECT * FROM badges WHERE code = ?', m[1]); if (!b) return next();
     const w = load(b.worker_id), co = get('SELECT * FROM companies WHERE id = ?', w.company_id) || get('SELECT * FROM companies WHERE id = 1');
-    const trusted = isTrusted(all('SELECT period, score, status FROM evaluations WHERE worker_id = ?', w.id));
+    const evs = all('SELECT * FROM evaluations WHERE worker_id = ?', w.id), trusted = isTrusted(evs), rt = rating(evs);
+    if (!b.revoked_at) run('UPDATE badges SET printed = ? WHERE id = ?', printSig(w, rt, trusted), b.id);
     res.type('pdf').attachment(`carne-${initials(w.name).toLowerCase()}-${b.code}${req.query.hoja ? '-a4' : ''}.pdf`);
-    badgePdf(res, { b, w, co, s: settings(), trusted, url: `${baseUrl(req)}/verificar/${b.code}` }, !!req.query.hoja);
+    badgePdf(res, { b, w, co, s: settings(), trusted, rt, url: `${baseUrl(req)}/verificar/${b.code}` }, !!req.query.hoja);
   });
   r.post('/carnes/:code/anular', (req, res, next) => {
     const b = get('SELECT * FROM badges WHERE code = ?', req.params.code); if (!b) return next();
@@ -276,13 +305,14 @@ export function mountWorkers(r, { shell, ic, csrf }) {
 // Verificación pública: solo nombre, título, empresa, periodo, fecha y vigencia. Nunca la ficha laboral.
 export function verifyData(code) {
   code = String(code).toUpperCase();
-  const c = get(`SELECT c.code, c.title, c.issued_at, c.revoked_at, w.name, co.name AS company, e.period FROM certificates c JOIN workers w ON w.id = c.worker_id
+  const c = get(`SELECT c.code, c.title, c.issued_at, c.revoked_at, c.ratings, w.name, co.name AS company, e.period FROM certificates c JOIN workers w ON w.id = c.worker_id
     LEFT JOIN companies co ON co.id = c.company_id LEFT JOIN evaluations e ON e.id = c.evaluation_id WHERE c.code = ?`, code);
-  if (c) return { type: 'cert', ...c, state: c.revoked_at ? 'anulado' : 'valido', period: periodName(c.period) };
+  if (c) { let rt = null; try { rt = c.ratings ? JSON.parse(c.ratings) : null; } catch { rt = null; } return { type: 'cert', ...c, rt, state: c.revoked_at ? 'anulado' : 'valido', period: periodName(c.period) }; }
   const b = get(`SELECT b.*, w.name, w.trade, w.photo, w.status, w.id AS wid, co.name AS company FROM badges b JOIN workers w ON w.id = b.worker_id
     LEFT JOIN companies co ON co.id = w.company_id WHERE b.code = ?`, code);
   if (!b) return null;
   const state = b.revoked_at ? 'anulado' : b.expires < today() ? 'vencido' : b.status === 'inactivo' ? 'inactivo' : 'valido';
-  return { type: 'carne', code: b.code, name: b.name, trade: b.trade, photo: b.photo, company: b.company, expires: dmy(b.expires), issued_at: b.issued_at, state,
-    trusted: state === 'valido' && isTrusted(all('SELECT period, score, status FROM evaluations WHERE worker_id = ?', b.wid)) };
+  const evs = all('SELECT * FROM evaluations WHERE worker_id = ?', b.wid);
+  return { rt: state === 'valido' ? rating(evs) : null, type: 'carne', code: b.code, name: b.name, trade: b.trade, photo: b.photo, company: b.company, expires: dmy(b.expires), issued_at: b.issued_at, state,
+    trusted: state === 'valido' && isTrusted(evs) };
 }

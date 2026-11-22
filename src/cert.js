@@ -15,9 +15,21 @@ function img(p) {
   if (f.endsWith('.webp')) f = f.replace(/\.webp$/, '.png');
   return /\.(png|jpe?g)$/i.test(f) && fs.existsSync(f) ? f : null;
 }
+// Cinco estrellas con relleno parcial (4.5 = cuatro y media).
+const starPts = (cx, cy, R) => Array.from({ length: 10 }, (_, i) => { const a = -Math.PI / 2 + (i * Math.PI) / 5, r = i % 2 ? R * .45 : R; return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; });
+export function starsPdf(doc, x, y, size, v, color, empty = '#d6dde5') {
+  for (let i = 0; i < 5; i++) {
+    const cx = x + size / 2 + i * size * 1.12, cy = y + size / 2, pts = starPts(cx, cy, size / 2), f = Math.max(0, Math.min(1, (v || 0) - i));
+    doc.polygon(...pts).fill(empty);
+    if (f > 0) { doc.save(); doc.rect(cx - size / 2, y, size * f, size).clip(); doc.polygon(...pts).fill(color); doc.restore(); }
+  }
+  return size * 1.12 * 4 + size;
+}
 const longDate = (iso) => { const [y, m, d] = iso.slice(0, 10).split('-'); return `${+d} de ${MES[+m - 1]} de ${y}`; };
 
 export function certificatePdf(out, { c, w, co, ev, url }) {
+  let rt = null; try { rt = c.ratings ? JSON.parse(c.ratings) : null; } catch { rt = null; }
+  if (rt && !rt.some((r) => r.v)) rt = null;
   const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 0, info: { Title: `${c.title} · ${w.name}`, Author: co.name, Subject: `Certificado ${c.code}` } });
   doc.pipe(out);
   const W = doc.page.width, H = doc.page.height, cx = W / 2;
@@ -49,7 +61,18 @@ export function certificatePdf(out, { c, w, co, ev, url }) {
   doc.fontSize(size).fillColor(DEEP).text(w.name, 0, 252 + (34 - size) / 2, { width: W, align: 'center' });
   doc.moveTo(cx - 240, 296).lineTo(cx + 240, 296).lineWidth(1).stroke(GOLD);
   doc.circle(cx, 296, 2.4).fill(GOLD);
-  doc.font('Helvetica').fontSize(11).fillColor('#2a3540').text(c.body, cx - 270, 310, { width: 540, align: 'center', lineGap: 3 });
+  doc.font('Helvetica').fontSize(rt ? 10.5 : 11).fillColor('#2a3540').text(c.body, cx - 270, 308, { width: 540, align: 'center', lineGap: rt ? 2 : 3 });
+
+  // Calificación de puntualidad, garantía y calidad al momento de emitirlo
+  if (rt) {
+    const y0 = Math.min(doc.y + 10, 362), cols = rt.filter((r) => r.v);
+    cols.forEach((r, i) => {
+      const x = cx + (i - (cols.length - 1) / 2) * 170, sw = 13 * 1.12 * 4 + 13;
+      doc.font('Helvetica-Bold').fontSize(8).fillColor(MUTED).text(r.t.toUpperCase(), x - 80, y0, { width: 160, align: 'center', characterSpacing: 1.2 });
+      starsPdf(doc, x - sw / 2 - 14, y0 + 12, 13, r.v, GOLD);
+      doc.font('Helvetica-Bold').fontSize(9).fillColor(INK).text(String(r.v).replace('.', ','), x + sw / 2 - 8, y0 + 14, { width: 30 });
+    });
+  }
 
   // Sello del nivel
   const lv = ev ? levelOf(ev.level) : null, sc = lv && lv.k !== 'base' ? lv.c : GOLD;
@@ -69,7 +92,7 @@ export function certificatePdf(out, { c, w, co, ev, url }) {
   const xs = sig.length === 1 ? [cx] : [cx - 150, cx + 150];
   sig.forEach(([file, name, role], i) => {
     const x = xs[i], f = img(file);
-    if (f) doc.image(f, x - 70, 400, { fit: [140, 52], align: 'center', valign: 'bottom' });
+    if (f) doc.image(f, x - 70, rt ? 414 : 400, { fit: [140, rt ? 38 : 52], align: 'center', valign: 'bottom' });
     doc.moveTo(x - 95, 456).lineTo(x + 95, 456).lineWidth(.8).stroke(INK);
     doc.font('Helvetica-Bold').fontSize(9.5).fillColor(INK).text(name || ' ', x - 120, 462, { width: 240, align: 'center' });
     doc.font('Helvetica').fontSize(8).fillColor(MUTED).text(role || '', x - 120, 476, { width: 240, align: 'center' });

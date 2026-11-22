@@ -77,6 +77,8 @@ app.get('/verificar/:code', (req, res) => {
     ${isB && c.photo ? `<img class="vf-photo" src="${e(c.photo)}" alt="Foto de ${e(c.name)}">` : ''}<span class="vf-ico" aria-hidden="true">${ok ? '✓' : '!'}</span><p class="eyebrow">Verificación de ${isB ? 'carné' : 'certificado'}</p>
     <h1>${c ? TIT[c.state] : 'Código no encontrado'}</h1>${c && MSG[c.state] ? `<p class="vf-msg">${MSG[c.state]}</p>` : ''}
     ${c?.trusted ? '<p class="vf-trust">★ Trabajador de confianza</p>' : ''}
+    ${c?.rt?.some((r) => r.v) ? `<ul class="vf-rate" aria-label="Calificación">${c.rt.filter((r) => r.v).map((r, i) => `<li><span>${e(r.t)}</span><i style="--f:${r.v * 20}%;--i:${i}" role="img" aria-label="${String(r.v).replace('.', ',')} de 5"></i><b>${String(r.v).replace('.', ',')}</b></li>`).join('')}</ul>
+      <p class="vf-note">${isB ? 'Calificación actual según sus últimas evaluaciones.' : 'Calificación al emitir el certificado.'}</p>` : ''}
     ${!c ? '<p>Revisa que el código esté bien escrito. Si el problema sigue, contáctanos.</p>' : isB
       ? `<dl><dt>Nombre</dt><dd>${e(c.name)}</dd>${c.trade ? `<dt>Oficio</dt><dd>${e(c.trade)}</dd>` : ''}<dt>Empresa</dt><dd>${e(c.company || '')}</dd><dt>Válido hasta</dt><dd>${e(c.expires)}</dd><dt>Carné</dt><dd>${e(c.code)}</dd></dl>`
       : `<dl><dt>Otorgado a</dt><dd>${e(c.name)}</dd><dt>Reconocimiento</dt><dd>${e(c.title)}</dd><dt>Empresa</dt><dd>${e(c.company || '')}</dd>

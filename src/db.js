@@ -58,6 +58,10 @@ const MIGRATIONS = [
      expires TEXT NOT NULL, issued_by TEXT, issued_at TEXT DEFAULT (datetime('now')), revoked_at TEXT, revoked_reason TEXT);`,
   // Descripciones nuevas de la tienda: solo reemplaza las del sembrado inicial, no las editadas en el panel.
   PRODUCT_COPY.map(([slug, old, txt]) => `UPDATE products SET description = ${q(txt)} WHERE slug = ${q(slug)} AND (description IS NULL OR description IN ('', ${q(old)}));`).join(' '),
+  // v0.4: criterio Garantía, calificación guardada en el certificado y datos del último carné impreso.
+  `ALTER TABLE evaluations ADD COLUMN s_gar INTEGER;
+   ALTER TABLE certificates ADD COLUMN ratings TEXT;
+   ALTER TABLE badges ADD COLUMN printed TEXT;`,
 ];
 
 db.exec('CREATE TABLE IF NOT EXISTS _migrations (n INTEGER PRIMARY KEY)');

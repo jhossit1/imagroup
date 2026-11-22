@@ -36,8 +36,9 @@ if (ev) {
     const l = seg && seg < 3 ? LV[3] : LV.find((x) => score >= x[2]);
     ring.style.setProperty('--p', score); ring.style.setProperty('--lc', l[3]);
     gate.hidden = !(seg && seg < 3);
-    lvl.textContent = n < 6 ? `Faltan ${6 - n} criterios` : l[1];
-    bono.textContent = n === 6 && bonos[l[0]] ? `Bono propuesto: S/ ${bonos[l[0]]}` : n === 6 ? 'Sin bono' : '';
+    const T = ev.querySelectorAll('fieldset[data-k]').length;
+    lvl.textContent = n < T ? (T - n === 1 ? 'Falta 1 criterio' : `Faltan ${T - n} criterios`) : l[1];
+    bono.textContent = n === T && bonos[l[0]] ? `Bono propuesto: S/ ${bonos[l[0]]}` : n === T ? 'Sin bono' : '';
     const from = shown, t0 = performance.now();
     const step = (t) => { const p = Math.min(1, (t - t0) / 500); out.textContent = Math.round(from + (score - from) * p); if (p < 1) requestAnimationFrame(step); else shown = score; };
     requestAnimationFrame(step);
@@ -53,3 +54,40 @@ if (matchMedia('(hover: hover) and (prefers-reduced-motion: no-preference)').mat
 
 // Carné: girar para ver el reverso.
 document.querySelectorAll("[data-flip]").forEach((b) => b.addEventListener("click", () => b.classList.toggle("flip")));
+
+// Ficha del trabajador: el carné de la derecha cambia mientras se escribe.
+const wf = document.querySelector('[data-wform]');
+if (wf) {
+  const card = wf.querySelector('.bc'), out = (k) => wf.querySelector(`[data-out="${k}"]`), cos = JSON.parse(wf.dataset.cos || '{}');
+  const ini = (n) => String(n).trim().split(/\s+/).slice(0, 2).map((x) => x[0] || '').join('').toUpperCase() || '?';
+  const bump = (el) => { if (!el) return; el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); };
+  wf.querySelectorAll('[data-live]').forEach((inp) => inp.addEventListener('input', () => {
+    const k = inp.dataset.live, el = out(k), v = inp.value.trim();
+    if (el) { el.textContent = v || (k === 'name' ? 'Nombre del trabajador' : ''); bump(el); }
+    if (k === 'name' && out('initials')) out('initials').textContent = ini(v || '?');
+    card.classList.remove('flip');
+  }));
+  wf.querySelector('[data-live-co]')?.addEventListener('change', (e) => { const el = out('company'); el.textContent = cos[e.target.value] || ''; bump(el); });
+  const box = wf.querySelector('[data-out-photo]'), drop = wf.querySelector('[data-drop]'), file = wf.querySelector('[data-live-photo]');
+  const show = (src) => {
+    const slot = drop.querySelector('img, .w-photo-ph');
+    box.replaceChildren();
+    if (src) {
+      const a = new Image(); a.src = src; a.alt = ''; box.append(a);
+      const b = new Image(); b.src = src; b.alt = ''; slot.replaceWith(b);
+    } else {
+      const sp = document.createElement('span'); sp.dataset.out = 'initials'; sp.style.setProperty('--hue', '#1a5f99');
+      sp.textContent = ini(wf.querySelector('[data-live=name]').value); box.append(sp);
+    }
+    bump(box); card.classList.remove('flip');
+  };
+  file?.addEventListener('change', () => {
+    const f = file.files[0]; if (!f) return;
+    if (f.size > 4 * 1024 * 1024) { alert('La foto pesa más de 4 MB. Elige una más liviana.'); file.value = ''; return; }
+    const r = new FileReader(); r.onload = () => show(r.result); r.readAsDataURL(f);
+  });
+  wf.querySelector('[data-live-rm]')?.addEventListener('change', (e) => { if (e.target.checked) show(''); });
+  ['dragenter', 'dragover'].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach((t) => drop.addEventListener(t, () => drop.classList.remove('over')));
+  drop.addEventListener('drop', (e) => { e.preventDefault(); if (e.dataTransfer.files[0]) { file.files = e.dataTransfer.files; file.dispatchEvent(new Event('change')); } });
+}

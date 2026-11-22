@@ -4,6 +4,7 @@ import path from 'node:path';
 import PDFDocument from 'pdfkit';
 import QRCode from 'qrcode';
 import { DATA_DIR } from './db.js';
+import { starsPdf } from './cert.js';
 
 const W = 153.07, H = 242.65, R = 9, MM = 72 / 25.4;
 const INK = '#14202c', BLUE = '#1a5f99', DEEP = '#14324f', GOLD = '#c9a24a', LEAF = '#3d8a37', MUTED = '#5d6874';
@@ -24,7 +25,7 @@ function qr(doc, text, x, y, size, color = INK) {
 }
 
 function front(doc, x, y, d) {
-  const { b, w, co, trusted } = d;
+  const { b, w, co, trusted, rt } = d;
   doc.save().translate(x, y).roundedRect(0, 0, W, H, R).clip();
   doc.rect(0, 0, W, H).fill('#ffffff');
   doc.rect(0, 0, W, 74).fill(doc.linearGradient(0, 0, W, 74).stop(0, '#2f86cc').stop(1, DEEP));
@@ -36,7 +37,7 @@ function front(doc, x, y, d) {
   doc.font('Helvetica').fontSize(5.6).fillColor('#dbe8f5').text('CARNÉ DE IDENTIFICACIÓN', 40, 25, { width: W - 46, characterSpacing: .6 });
 
   // Foto o iniciales
-  const px = (W - 72) / 2, py = 48, pw = 72, ph = 88, photo = img(w.photo);
+  const px = (W - 66) / 2, py = 46, pw = 66, ph = 80, photo = img(w.photo);
   doc.roundedRect(px - 3, py - 3, pw + 6, ph + 6, 10).fill('#ffffff');
   doc.save().roundedRect(px, py, pw, ph, 8).clip();
   if (photo) doc.image(photo, px, py, { cover: [pw, ph], align: 'center', valign: 'center' });
@@ -44,17 +45,30 @@ function front(doc, x, y, d) {
   doc.restore();
   doc.roundedRect(px - 3, py - 3, pw + 6, ph + 6, 10).lineWidth(.6).stroke('#d6dde5');
 
+  if (trusted) {
+    const tw = 100, tx = (W - tw) / 2, ty = py + ph - 4;
+    doc.roundedRect(tx, ty, tw, 12, 6).fill(LEAF);
+    doc.font('Helvetica-Bold').fontSize(5.6).fillColor('#ffffff').text('TRABAJADOR DE CONFIANZA', tx, ty + 3.6, { width: tw, align: 'center', characterSpacing: .5 });
+  }
+
   // Nombre, oficio y zona
   let fs0 = 10.5; doc.font('Helvetica-Bold');
-  while (doc.fontSize(fs0).heightOfString(w.name, { width: W - 20 }) > 28 && fs0 > 7.5) fs0 -= .5;
-  doc.fontSize(fs0).fillColor(INK).text(w.name, 10, 142, { width: W - 20, align: 'center', lineGap: -1 });
-  let yy = doc.y + 3;
-  if (w.trade) { doc.font('Helvetica-Bold').fontSize(7).fillColor(GOLD).text(w.trade.toUpperCase(), 10, yy, { width: W - 20, align: 'center', characterSpacing: 1 }); yy = doc.y + 1; }
-  if (w.zone) { doc.font('Helvetica').fontSize(6.2).fillColor(MUTED).text(w.zone, 10, yy, { width: W - 20, align: 'center' }); yy = doc.y; }
-  if (trusted) {
-    const tw = 104, tx = (W - tw) / 2, ty = Math.max(yy + 5, 186);
-    doc.roundedRect(tx, ty, tw, 13, 6.5).fill(LEAF);
-    doc.font('Helvetica-Bold').fontSize(5.8).fillColor('#ffffff').text('TRABAJADOR DE CONFIANZA', tx, ty + 4, { width: tw, align: 'center', characterSpacing: .5 });
+  while (doc.fontSize(fs0).heightOfString(w.name, { width: W - 20 }) > 26 && fs0 > 7.5) fs0 -= .5;
+  doc.fontSize(fs0).fillColor(INK).text(w.name, 10, py + ph + (trusted ? 12 : 6), { width: W - 20, align: 'center', lineGap: -1 });
+  let yy = doc.y + 2;
+  if (w.trade) { doc.font('Helvetica-Bold').fontSize(6.6).fillColor(GOLD).text(w.trade.toUpperCase(), 10, yy, { width: W - 20, align: 'center', characterSpacing: 1 }); yy = doc.y + 1; }
+  if (w.zone) { doc.font('Helvetica').fontSize(6).fillColor(MUTED).text(w.zone, 10, yy, { width: W - 20, align: 'center' }); yy = doc.y; }
+
+  // Puntualidad, garantía y calidad (se recalculan cada vez que se descarga)
+  const cols = (rt || []).filter((r) => r.v);
+  if (cols.length) {
+    const y0 = Math.min(Math.max(yy + 5, 172), H - 58), cw = (W - 12) / cols.length;
+    cols.forEach((r, i) => {
+      const x = 6 + i * cw, sz = 5.4, sw = sz * 1.12 * 4 + sz;
+      doc.font('Helvetica-Bold').fontSize(4.8).fillColor(MUTED).text(r.t.toUpperCase(), x, y0, { width: cw, align: 'center', characterSpacing: .4 });
+      starsPdf(doc, x + (cw - sw) / 2, y0 + 7, sz, r.v, GOLD);
+      doc.font('Helvetica-Bold').fontSize(5.4).fillColor(INK).text(String(r.v).replace('.', ',') + ' / 5', x, y0 + 14.5, { width: cw, align: 'center' });
+    });
   }
 
   // Pie con código, vigencia y QR pequeño
