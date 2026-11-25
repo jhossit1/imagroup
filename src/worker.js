@@ -31,6 +31,11 @@ export default {
       url.protocol = 'https:';
       return Response.redirect(url.href, 308);
     }
+    // Una sola dirección: www.dominio -> dominio.
+    if (url.hostname.startsWith('www.')) {
+      url.hostname = url.hostname.slice(4);
+      return Response.redirect(url.href, 308);
+    }
     if (url.pathname.startsWith('/uploads/')) {
       const key = url.pathname.slice(9);
       const ext = key.split('.').pop().toLowerCase();
@@ -45,6 +50,11 @@ export default {
     headers.set('x-forwarded-for', request.headers.get('cf-connecting-ip') || '127.0.0.1');
     headers.set('x-forwarded-proto', url.protocol.replace(':', ''));
     const site = env.SITE.get(env.SITE.idFromName('imagroup'));
-    return site.fetch(new Request(request, { headers }));
+    const res = await site.fetch(new Request(request, { headers }));
+    if (!url.hostname.endsWith('.workers.dev')) return res;
+    // La dirección de respaldo no debe competir con el dominio en los buscadores.
+    const copy = new Response(res.body, res);
+    copy.headers.set('x-robots-tag', 'noindex');
+    return copy;
   },
 };

@@ -30,7 +30,7 @@ SETUP_KEY="una-clave-larga-de-al-menos-24-caracteres"
 3. Guarda la clave para crear administradores: `npx wrangler secret put SETUP_KEY` (pega una clave larga y aleatoria).
 4. Publica: `npm run deploy`. Queda en `https://imagroup.<tu-subdominio>.workers.dev`.
 5. Crea el primer administrador: `SETUP_KEY=... npm run create-admin -- usuario https://imagroup.<tu-subdominio>.workers.dev`.
-6. Dominio propio: en Workers → imagroup → Settings → Domains & Routes → Add → Custom domain (el dominio debe estar en Cloudflare).
+6. Dominio propio (ya hecho para imagroupsac.com): el dominio usa los nameservers de Cloudflare y `wrangler.jsonc` define rutas `imagroupsac.com/*` y `www.imagroupsac.com/*`. En el DNS, solo `imagroupsac.com` y `www` llevan el proxy activado; `mail`, `webmail`, `cpanel`, `ftp` y demás quedan en "DNS only" porque apuntan al hosting del correo. `www` redirige al dominio principal y `workers.dev` responde con `noindex`.
 
 Para publicar cambios después, basta con `npm run deploy`.
 

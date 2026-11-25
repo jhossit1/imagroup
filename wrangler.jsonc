@@ -13,6 +13,13 @@
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Site"] }],
   // Fotos subidas desde el panel (Workers KV: gratis y sin tarjeta; hasta 25 MB por archivo).
   "kv_namespaces": [{ "binding": "UPLOADS", "id": "3a72f9fa87394c30b1b558575eaee531" }],
+  // Dominio propio por rutas: en el DNS, imagroupsac.com y www deben tener el proxy activado.
+  // workers.dev queda como respaldo (no se indexa en buscadores).
+  "workers_dev": true,
+  "routes": [
+    { "pattern": "imagroupsac.com/*", "zone_name": "imagroupsac.com" },
+    { "pattern": "www.imagroupsac.com/*", "zone_name": "imagroupsac.com" }
+  ],
   "vars": { "APP_VERSION": "cloudflare" },
   "observability": { "enabled": true }
 }
