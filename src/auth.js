@@ -17,7 +17,7 @@ export function checkPassword(pw, stored) {
   return crypto.timingSafeEqual(k, Buffer.from(key, 'hex'));
 }
 export function passwordProblem(pw) {
-  if (!pw || pw.length < 12) return 'Usa al menos 12 caracteres.';
+  if (!pw || pw.length < 8) return 'Usa al menos 8 caracteres.';
   if (!/[a-zA-Z]/.test(pw) || !/[0-9]/.test(pw)) return 'Combina letras y números.';
   return null;
 }

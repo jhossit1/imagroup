@@ -127,7 +127,7 @@ r.get('/setup', (req, res) => {
 });
 const setupForm = (t, u, err = '') => `<form class="a-card a-login" method="post" action="/admin/setup"><h1>Crea tu contraseña</h1><p>Usuario: <b>${h(u)}</b></p>
 ${err ? `<p class="a-err" role="alert">${h(err)}</p>` : ''}<input type="hidden" name="t" value="${h(t)}"><input type="hidden" name="username" value="${h(u)}" autocomplete="username">
-<label>Contraseña (mín. 12 caracteres, letras y números)<input name="password" type="password" required minlength="12" autocomplete="new-password"></label>
+<label>Contraseña (mín. 8 caracteres, letras y números)<input name="password" type="password" required minlength="8" autocomplete="new-password"></label>
 <label>Repite la contraseña<input name="password2" type="password" required autocomplete="new-password"></label><button class="a-btn">Guardar y entrar</button></form>`;
 r.post('/setup', (req, res) => {
   const t = get('SELECT * FROM setup_tokens WHERE token_hash = ? AND expires > ?', sha(String(req.body.t || '')), Date.now());
