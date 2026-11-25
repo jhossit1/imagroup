@@ -3,8 +3,9 @@ import crypto from 'node:crypto';
 import { all, get, run, audit, settings } from './db.js';
 import { h, money } from './views.js';
 import { CRITERIA, LEVELS, levelOf, evaluate, isTrusted, TRUST_RULE, periodName, rating, N_CRIT } from './method.js';
-import { certificatePdf } from './cert.js';
-import { badgePdf } from './badge.js';
+import { certificatePdf, certImages } from './cert.js';
+import { badgePdf, badgeImages } from './badge.js';
+import { loadImages } from './files.js';
 import { teamPath } from './team.js';
 import { reviewsCard, mountReviewsAdmin, pendingReviews, clientScore } from './reviews.js';
 import QRCode from 'qrcode';
@@ -271,13 +272,14 @@ export function mountWorkers(r, { shell, ic, csrf }) {
     audit(req.admin.username, 'certificate', 'workers', w.id, `${code} ${title}`);
     res.redirect('/admin/trabajadores/' + w.id + '#cert-' + code);
   });
-  r.get('/certificados/:file', (req, res, next) => {
+  r.get('/certificados/:file', async (req, res, next) => {
     const m = /^([A-F0-9]{5}-[A-F0-9]{5})\.pdf$/.exec(req.params.file); if (!m) return next();
     const c = get('SELECT * FROM certificates WHERE code = ?', m[1]); if (!c) return next();
     const w = load(c.worker_id), co = get('SELECT * FROM companies WHERE id = ?', c.company_id), ev = c.evaluation_id ? get('SELECT * FROM evaluations WHERE id = ?', c.evaluation_id) : null;
     const base = `${req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : req.protocol}://${req.get('host')}`;
     res.type('pdf').attachment(`certificado-${initials(w.name).toLowerCase()}-${c.code}.pdf`);
-    certificatePdf(res, { c, w, co, ev, url: `${base}/verificar/${c.code}` });
+    const d = { c, w, co, ev, url: `${base}/verificar/${c.code}` };
+    certificatePdf(res, d, await loadImages(certImages(d)));
   });
   // ---- Carnés ----
   r.post('/trabajadores/:id/carne', (req, res, next) => {
@@ -289,14 +291,15 @@ export function mountWorkers(r, { shell, ic, csrf }) {
     audit(req.admin.username, 'badge', 'workers', w.id, `${code} vence ${exp}`);
     res.redirect(`/admin/trabajadores/${w.id}#carne`);
   });
-  r.get('/carnes/:file', (req, res, next) => {
+  r.get('/carnes/:file', async (req, res, next) => {
     const m = /^([A-F0-9]{5}-[A-F0-9]{5})\.pdf$/.exec(req.params.file); if (!m) return next();
     const b = get('SELECT * FROM badges WHERE code = ?', m[1]); if (!b) return next();
     const w = load(b.worker_id), co = get('SELECT * FROM companies WHERE id = ?', w.company_id) || get('SELECT * FROM companies WHERE id = 1');
     const evs = all('SELECT * FROM evaluations WHERE worker_id = ?', w.id), trusted = isTrusted(evs), rt = rating(evs);
     if (!b.revoked_at) run('UPDATE badges SET printed = ? WHERE id = ?', printSig(w, rt, trusted), b.id);
     res.type('pdf').attachment(`carne-${initials(w.name).toLowerCase()}-${b.code}${req.query.hoja ? '-a4' : ''}.pdf`);
-    badgePdf(res, { b, w, co, s: settings(), trusted, rt, url: `${baseUrl(req)}/verificar/${b.code}` }, !!req.query.hoja);
+    const d = { b, w, co, s: settings(), trusted, rt, url: `${baseUrl(req)}/verificar/${b.code}` };
+    badgePdf(res, d, !!req.query.hoja, await loadImages(badgeImages(d)));
   });
   r.post('/carnes/:code/anular', (req, res, next) => {
     const b = get('SELECT * FROM badges WHERE code = ?', req.params.code); if (!b) return next();

@@ -1,14 +1,23 @@
 // Páginas del sitio armadas con bloques. Cada página tiene un borrador (lo que edita el administrador)
 // y una versión publicada (lo que ven los visitantes). Publicar guarda una copia en el historial.
 import crypto from 'node:crypto';
-import { all, get, run, db } from './db.js';
+import { all, get, run, exec } from './db.js';
 import { BLOCKS, STYLE_FIELDS } from './blocks.js';
 
-db.exec(`CREATE TABLE IF NOT EXISTS pages (id INTEGER PRIMARY KEY, slug TEXT UNIQUE NOT NULL, title TEXT NOT NULL, description TEXT DEFAULT '',
+// Crea las tablas de páginas y las páginas del sistema que falten. Se llama al abrir la base.
+export function initPages() {
+exec(`CREATE TABLE IF NOT EXISTS pages (id INTEGER PRIMARY KEY, slug TEXT UNIQUE NOT NULL, title TEXT NOT NULL, description TEXT DEFAULT '',
   system TEXT, nav_label TEXT, in_nav INTEGER DEFAULT 0, nav_sort INTEGER DEFAULT 0, icon TEXT DEFAULT 'doc',
   draft TEXT, published TEXT, updated_at TEXT DEFAULT (datetime('now')), published_at TEXT);
 CREATE TABLE IF NOT EXISTS page_versions (id INTEGER PRIMARY KEY, page_id INTEGER NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
   blocks TEXT NOT NULL, title TEXT, admin TEXT, created_at TEXT DEFAULT (datetime('now')));`);
+for (const [key, p] of Object.entries(SYSTEM)) {
+  if (get('SELECT id FROM pages WHERE system = ?', key)) continue;
+  const blocks = JSON.stringify(p.blocks());
+  run(`INSERT INTO pages (slug, title, description, system, nav_label, in_nav, nav_sort, icon, draft, published, published_at) VALUES (?,?,?,?,?,?,?,?,?,?, datetime('now'))`,
+    p.slug || '/', p.title, p.desc || '', key, p.label || p.title, p.nav ? 1 : 0, p.nav || 0, p.icon, blocks, blocks);
+}
+}
 
 export const newId = () => crypto.randomBytes(4).toString('hex');
 const B = (type, data = {}) => ({ id: newId(), type, data });
@@ -30,12 +39,6 @@ export const SYSTEM = {
 // Direcciones que usa el sistema y no pueden tomar páginas nuevas.
 export const RESERVED = /^(admin|equipo|tienda|servicios|portafolio|contacto|carrito|verificar|pedido|img|css|js|uploads|healthz|robots\.txt|sitemap\.xml|p)$/;
 
-for (const [key, p] of Object.entries(SYSTEM)) {
-  if (get('SELECT id FROM pages WHERE system = ?', key)) continue;
-  const blocks = JSON.stringify(p.blocks());
-  run(`INSERT INTO pages (slug, title, description, system, nav_label, in_nav, nav_sort, icon, draft, published, published_at) VALUES (?,?,?,?,?,?,?,?,?,?, datetime('now'))`,
-    p.slug || '/', p.title, p.desc || '', key, p.label || p.title, p.nav ? 1 : 0, p.nav || 0, p.icon, blocks, blocks);
-}
 
 const parse = (t) => { try { const v = JSON.parse(t || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
 export const pageBySystem = (key) => get('SELECT * FROM pages WHERE system = ?', key);

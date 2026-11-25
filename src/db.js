@@ -1,13 +1,18 @@
-import { DatabaseSync } from 'node:sqlite';
-import fs from 'node:fs';
-import path from 'node:path';
+// Base de datos: SQLite de un Durable Object de Cloudflare. Sus consultas son síncronas, como las de node:sqlite.
 import { PRODUCT_COPY } from './copy-products.js';
 
-export const DATA_DIR = process.env.DATA_DIR || path.resolve('data');
-fs.mkdirSync(path.join(DATA_DIR, 'uploads'), { recursive: true });
-
-export const db = new DatabaseSync(path.join(DATA_DIR, 'imagroup.db'));
-db.exec('PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;');
+let storage = null;
+// SQLite del Durable Object solo acepta texto, números, null y ArrayBuffer.
+const args = (a) => a.map((v) => (v === undefined ? null : typeof v === 'boolean' ? +v : typeof v === 'bigint' ? Number(v) : v));
+export const exec = (sql) => storage.sql.exec(sql);
+export const all = (sql, ...a) => storage.sql.exec(sql, ...args(a)).toArray();
+export const get = (sql, ...a) => storage.sql.exec(sql, ...args(a)).toArray()[0];
+export const run = (sql, ...a) => {
+  storage.sql.exec(sql, ...args(a));
+  const r = storage.sql.exec('SELECT changes() AS changes, last_insert_rowid() AS id').one();
+  return { changes: r.changes, lastInsertRowid: r.id };
+};
+export const transaction = (fn) => storage.transactionSync(fn);
 
 const q = (s) => `'${String(s).replace(/'/g, "''")}'`;
 // Migraciones por versión: solo se agregan, nunca se editan las ya aplicadas.
@@ -71,17 +76,16 @@ const MIGRATIONS = [
    CREATE INDEX reviews_worker ON reviews (worker_id, status);`,
 ];
 
-db.exec('CREATE TABLE IF NOT EXISTS _migrations (n INTEGER PRIMARY KEY)');
-const done = new Set(db.prepare('SELECT n FROM _migrations').all().map((r) => r.n));
-MIGRATIONS.forEach((sql, i) => {
-  if (done.has(i)) return;
-  db.exec('BEGIN'); db.exec(sql); db.prepare('INSERT INTO _migrations (n) VALUES (?)').run(i); db.exec('COMMIT');
-  if (i === 0) seed();
-});
-
-export const all = (sql, ...a) => db.prepare(sql).all(...a);
-export const get = (sql, ...a) => db.prepare(sql).get(...a);
-export const run = (sql, ...a) => db.prepare(sql).run(...a);
+// Conecta la base del Durable Object y aplica las migraciones pendientes (cada una en su transacción).
+export function openDb(s) {
+  storage = s;
+  exec('CREATE TABLE IF NOT EXISTS _migrations (n INTEGER PRIMARY KEY)');
+  const done = new Set(all('SELECT n FROM _migrations').map((r) => r.n));
+  MIGRATIONS.forEach((sql, i) => {
+    if (done.has(i)) return;
+    transaction(() => { exec(sql); run('INSERT INTO _migrations (n) VALUES (?)', i); if (i === 0) seed(); });
+  });
+}
 
 export function settings() {
   return Object.fromEntries(all('SELECT key, value FROM settings').map((r) => [r.key, r.value]));
@@ -101,10 +105,9 @@ function seed() {
     review_banner: '1', notify_webhook: '',
     owner_name: '', owner_role: '', owner_bio: '', owner_photo: '/img/brand/ing-perfil.webp',
   };
-  const ins = db.prepare('INSERT INTO settings (key, value) VALUES (?, ?)');
-  for (const [k, v] of Object.entries(S)) ins.run(k, v);
+  for (const [k, v] of Object.entries(S)) run('INSERT INTO settings (key, value) VALUES (?, ?)', k, v);
 
-  const co = db.prepare('INSERT INTO companies (slug, name, tagline, description, scope, logo, logo_dark, image, sort) VALUES (?,?,?,?,?,?,?,?,?)');
+  const co = { run: (...a) => run('INSERT INTO companies (slug, name, tagline, description, scope, logo, logo_dark, image, sort) VALUES (?,?,?,?,?,?,?,?,?)', ...a) };
   co.run('imagroup', 'Imagroup S.A.C.', 'Grupo de Ingeniería Medioambiental',
     'Consultoría, gestión ambiental y municipal, y obras de ingeniería para proyectos de inversión pública y privada. Trabajamos en campo, con la comunidad y con el expediente técnico.',
     'Gestión de residuos sólidos\nEducación y comunicación ambiental\nAgua y saneamiento rural\nExpedientes técnicos y planos\nMantenimiento vial\nEnergía solar fotovoltaica',
@@ -114,7 +117,7 @@ function seed() {
     'Calzado de seguridad\nRopa de trabajo y outdoor\nProtección de cabeza, manos y respiratoria\nAccesorios y señalización',
     '/img/brand/gregorian-h.webp', '/img/brand/gregorian-sq.webp', '/img/p/casco.webp', 2);
 
-  const sv = db.prepare('INSERT INTO services (company_id, slug, title, summary, body, image, sort) VALUES (1,?,?,?,?,?,?)');
+  const sv = { run: (...a) => run('INSERT INTO services (company_id, slug, title, summary, body, image, sort) VALUES (1,?,?,?,?,?,?)', ...a) };
   [
     ['residuos-solidos-municipales', 'Residuos sólidos municipales', 'Estudios de caracterización y asesoría para implementar la gestión integral de residuos del municipio.', 'Acompañamos a gobiernos locales en el estudio de caracterización, la segregación en la fuente y la planificación del manejo integral de residuos sólidos.', '/img/f/residuos-1.webp'],
     ['residuos-solidos-no-municipales', 'Residuos sólidos no municipales', 'Asesoría para el manejo de residuos en actividades productivas y de servicios.', 'Apoyo técnico para organizar el manejo de residuos no municipales: identificación, almacenamiento, registros y valorización de residuos orgánicos.', '/img/f/organicos-1.webp'],
@@ -126,9 +129,9 @@ function seed() {
     ['energia-solar', 'Sistemas fotovoltaicos', 'Instalación de sistemas solares para energía en zonas aisladas.', 'Instalación de paneles solares, tableros y baterías para dotar de energía a locales en zonas sin red o con suministro inestable.', '/img/f/solar-1.webp'],
   ].forEach((r, i) => sv.run(...r, i));
 
-  const cat = db.prepare('INSERT INTO categories (slug, name, sort) VALUES (?,?,?)');
+  const cat = { run: (...a) => run('INSERT INTO categories (slug, name, sort) VALUES (?,?,?)', ...a) };
   [['calzado', 'Calzado'], ['ropa', 'Ropa de trabajo'], ['proteccion', 'Protección personal'], ['accesorios', 'Accesorios']].forEach((c, i) => cat.run(...c, i));
-  const pr = db.prepare('INSERT INTO products (category_id, slug, name, description, price_cents, image, sort) VALUES (?,?,?,?,?,?,?)');
+  const pr = { run: (...a) => run('INSERT INTO products (category_id, slug, name, description, price_cents, image, sort) VALUES (?,?,?,?,?,?,?)', ...a) };
   [
     [1, 'zapatos-de-seguridad', 'Zapatos de seguridad', 'Calzado de seguridad para obra y campo.', 7000, 'zapatos'],
     [1, 'botas-de-jebe', 'Botas de seguridad industrial', 'Botas de jebe para trabajo en zonas húmedas.', 3500, 'botas'],
@@ -147,7 +150,7 @@ function seed() {
     [4, 'silbato', 'Silbato con cuerda', 'Silbato capado con cuerda de seguridad.', 600, 'silbato'],
   ].forEach(([c, s, n, d, p, img], i) => pr.run(c, s, n, d, p, `/img/p/${img}.webp`, i));
 
-  const pj = db.prepare('INSERT INTO projects (slug, title, area, period, summary, image, gallery, sort) VALUES (?,?,?,?,?,?,?,?)');
+  const pj = { run: (...a) => run('INSERT INTO projects (slug, title, area, period, summary, image, gallery, sort) VALUES (?,?,?,?,?,?,?,?)', ...a) };
   [
     ['caracterizacion-residuos', 'Estudio de caracterización de residuos sólidos municipales', 'Residuos sólidos', '2018', 'Muestreo, pesaje y clasificación de residuos domiciliarios con equipo de campo.', 'residuos-1', 'residuos-2'],
     ['educacion-ambiental-colegios', 'Educación ambiental en colegios y comunidad', 'Educación ambiental', '2018', 'Talleres, pasacalles y campañas de segregación con estudiantes y vecinos.', 'educacion-1', 'educacion-2'],

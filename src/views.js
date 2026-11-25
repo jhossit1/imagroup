@@ -1,5 +1,5 @@
 // Plantillas públicas (HTML renderizado en servidor).
-import fs from 'node:fs';
+import ART from './product-art.json' with { type: 'json' };
 export const h = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 export const money = (c) => (c == null ? 'Consultar' : 'S/ ' + (c / 100).toFixed(2));
 export const lines = (t) => String(t || '').split('\n').map((s) => s.trim()).filter(Boolean);
@@ -44,7 +44,7 @@ export function layout(s, { title, desc, path = '/', body, theme = '', preview =
 ${s.review_banner === '1' ? '<meta name="robots" content="noindex">' : ''}
 <link rel="icon" href="/img/brand/imagroup.webp"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/site.css?v=21"><link rel="stylesheet" href="/css/blocks.css?v=1">${theme === 'shop' ? '<link rel="stylesheet" href="/css/shop.css?v=4"><script src="/js/shop.js?v=3" defer></script>' : ''}<script src="/js/theme.js?v=7"></script></head>
+<link rel="stylesheet" href="/css/site.css?v=22"><link rel="stylesheet" href="/css/blocks.css?v=1">${theme === 'shop' ? '<link rel="stylesheet" href="/css/shop.css?v=4"><script src="/js/shop.js?v=3" defer></script>' : ''}<script src="/js/theme.js?v=7"></script></head>
 <body class="${theme}">
 <a class="skip" href="#main">Saltar al contenido</a>
 ${s.review_banner === '1' ? '<div class="review">Versión de revisión. Los pagos en línea aún no están habilitados: los pedidos se confirman por WhatsApp o teléfono.</div>' : ''}
@@ -120,7 +120,6 @@ export function servicePage(s, v, others) {
 }
 
 // ---------- Tienda ----------
-const ART = JSON.parse(fs.readFileSync(new URL('./product-art.json', import.meta.url), 'utf8'));
 // Imagen recortada y color de marca de cada producto; si el admin sube otra foto se usa tal cual.
 export const art = (p) => ART[p.image] || { cut: p.image, tone: '#1a5f99', photo: true };
 // Texto oscuro sobre los tonos claros (arena y dorado), blanco sobre los demás.

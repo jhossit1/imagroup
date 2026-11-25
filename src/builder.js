@@ -1,17 +1,16 @@
 // Diseñador de páginas del panel: editar textos, imágenes y orden de bloques de cada página,
 // crear páginas nuevas, ordenar el menú, vista previa en vivo, publicar y volver a versiones anteriores.
-import fs from 'node:fs';
-import path from 'node:path';
 import multer from 'multer';
-import crypto from 'node:crypto';
-import { all, get, run, settings, audit, DATA_DIR } from './db.js';
+import { all, get, run, settings, audit } from './db.js';
+import { kvStorage, randomName, listUploads } from './files.js';
+import ASSET_LIST from './assets-manifest.json' with { type: 'json' };
 import { h, FOOT_1, FOOT_2, PAGE_ICONS } from './views.js';
 import { BLOCKS, STYLE_FIELDS } from './blocks.js';
 import { RESERVED, newId, cleanBlocks, saveDraft, publish, hasChanges, pagePath, blocksOf } from './pages.js';
 import { renderPage, pageCtx } from './render.js';
 
 const imgUpload = multer({
-  storage: multer.diskStorage({ destination: path.join(DATA_DIR, 'uploads'), filename: (_q, f, cb) => cb(null, crypto.randomBytes(8).toString('hex') + ({ 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' })[f.mimetype]) }),
+  storage: kvStorage((f) => randomName(({ 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' })[f.mimetype])),
   limits: { fileSize: 6 * 1024 * 1024, files: 1 }, fileFilter: (_q, f, cb) => cb(null, /^image\/(jpeg|png|webp)$/.test(f.mimetype)),
 });
 const slugify = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
@@ -53,7 +52,7 @@ export function mountBuilderAdmin(r, { shell, csrf, ic }) {
   <div class="pg-grid">${pages.map(card).join('')}</div></section>
   <dialog id="pg-new" class="pg-dialog"><form method="post" action="/admin/paginas/nueva">${csrf(req)}<h2>Nueva página</h2>
     <label>Nombre de la página<input name="title" required maxlength="80" placeholder="Ejemplo: Nosotros" data-slug-src></label>
-    <label>Dirección<span class="pg-slug">imagroup.raser.pe/<input name="slug" maxlength="60" pattern="[a-z0-9-]+" placeholder="nosotros" data-slug></span></label>
+    <label>Dirección<span class="pg-slug">${h(req.get('host'))}/<input name="slug" maxlength="60" pattern="[a-z0-9-]+" placeholder="nosotros" data-slug></span></label>
     <fieldset class="pg-tpl"><legend>Empezar con</legend>
       ${[['blank', 'En blanco', 'Solo un título para empezar desde cero.'], ['landing', 'Página de ventas', 'Portada, tarjetas, cifras, pasos, llamado, preguntas y formulario.'], ['info', 'Página informativa', 'Portada con foto de fondo, imagen y texto, galería y WhatsApp.']]
         .map(([v, l, d], i) => `<label><input type="radio" name="template" value="${v}" ${i ? '' : 'checked'}><b>${l}</b><small>${d}</small></label>`).join('')}
@@ -99,9 +98,10 @@ export function mountBuilderAdmin(r, { shell, csrf, ic }) {
   });
 
   // ---------- Imágenes disponibles ----------
-  r.get('/paginas/imagenes', (req, res) => {
-    const list = (dir, url, skip = /-sm\.webp$/) => { try { return fs.readdirSync(dir).filter((f) => /\.(webp|png|jpe?g)$/i.test(f) && !skip.test(f)).map((f) => url + f); } catch { return []; } };
-    const uploads = (() => { try { return fs.readdirSync(path.join(DATA_DIR, 'uploads')).filter((f) => /\.(webp|png|jpe?g)$/i.test(f)).map((f) => ({ f, t: fs.statSync(path.join(DATA_DIR, 'uploads', f)).mtimeMs })).sort((a, b) => b.t - a.t).map((x) => '/uploads/' + x.f); } catch { return []; } })();
+  r.get('/paginas/imagenes', async (req, res) => {
+    // Los archivos de public/ se listan al compilar (scripts/assets-manifest.js); las subidas se leen de KV.
+    const list = (dir, url, skip = /-sm\.webp$/) => (ASSET_LIST[dir] || []).filter((f) => /\.(webp|png|jpe?g)$/i.test(f) && !skip.test(f)).map((f) => url + f);
+    const uploads = await listUploads().catch(() => []);
     json(res, { groups: [['Subidas por ti', uploads], ['Fotos de obra', list('public/img/f', '/img/f/')], ['Productos', list('public/img/p/c', '/img/p/c/')], ['Logos y marca', list('public/img/brand', '/img/brand/', /\.png$|-sm\.webp$/)]] });
   });
 

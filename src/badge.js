@@ -1,20 +1,16 @@
 // Carné (fotocheck) vertical tamaño tarjeta CR80: 54 × 85.6 mm. Frente con foto y reverso con QR de verificación.
-import fs from 'node:fs';
-import path from 'node:path';
 import PDFDocument from 'pdfkit';
 import QRCode from 'qrcode';
-import { DATA_DIR } from './db.js';
+import { sendPdf } from './files.js';
 import { starsPdf } from './cert.js';
 
 const W = 153.07, H = 242.65, R = 9, MM = 72 / 25.4;
 const INK = '#14202c', BLUE = '#1a5f99', DEEP = '#14324f', GOLD = '#c9a24a', LEAF = '#3d8a37', MUTED = '#5d6874';
 const HUES = ['#1a5f99', '#3d8a37', '#c9a24a', '#c2467a', '#2f86cc'];
-const img = (p) => {
-  if (!p) return null;
-  let f = p.startsWith('/uploads/') ? path.join(DATA_DIR, 'uploads', path.basename(p)) : path.resolve('public', p.replace(/^\/+/, ''));
-  if (f.endsWith('.webp')) f = f.replace(/\.webp$/, '.png');
-  return /\.(png|jpe?g)$/i.test(f) && fs.existsSync(f) ? f : null;
-};
+// Imágenes ya cargadas por files.loadImages (ruta -> data URI) antes de dibujar el carné.
+let IMGS = new Map();
+const img = (p) => (p && IMGS.get(p)) || null;
+export const badgeImages = (d) => [d.co.logo, d.w.photo, d.co.signature];
 const dmy = (iso) => iso.slice(0, 10).split('-').reverse().join('/');
 const initials = (n) => String(n).trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
 
@@ -104,10 +100,11 @@ function back(doc, x, y, d) {
 }
 
 // hoja = false: PDF de 2 páginas tamaño tarjeta (para imprenta). hoja = true: A4 con ambas caras a tamaño real y marcas de corte.
-export function badgePdf(out, d, hoja = false) {
+export function badgePdf(out, d, hoja = false, imgs = new Map()) {
+  IMGS = imgs;
   const doc = new PDFDocument(hoja ? { size: 'A4', margin: 0 } : { size: [W, H], margin: 0 });
   doc.info.Title = `Carné ${d.b.code} · ${d.w.name}`; doc.info.Author = d.co.name;
-  doc.pipe(out);
+  sendPdf(out, doc);
   if (!hoja) { front(doc, 0, 0, d); doc.addPage({ size: [W, H], margin: 0 }); back(doc, 0, 0, d); }
   else {
     const gap = 12 * MM, x1 = (doc.page.width - (2 * W + gap)) / 2, x2 = x1 + W + gap, y = 120;

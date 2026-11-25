@@ -1,7 +1,7 @@
 import express from 'express';
-import path from 'node:path';
-import { all, get, run, settings, DATA_DIR } from './db.js';
-import { loadSession, limited } from './auth.js';
+import crypto from 'node:crypto';
+import { all, get, run, settings } from './db.js';
+import { loadSession, limited, sha, token } from './auth.js';
 import * as V from './views.js';
 import admin from './admin.js';
 import { verifyData } from './workers.js';
@@ -11,7 +11,8 @@ import { pageBySystem, pageBySlug, pagePath, navPages } from './pages.js';
 import { renderPage, visibleProducts } from './render.js';
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+// Puerto virtual: en Cloudflare no se abre ningún puerto; src/worker.js entrega cada petición a este servidor.
+export const PORT = 3000;
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
 
@@ -23,8 +24,7 @@ app.use((req, res, next) => {
   req.cookies = Object.fromEntries((req.headers.cookie || '').split(';').map((c) => c.trim().split('=')).filter((p) => p[0]).map(([k, ...v]) => [k, decodeURIComponent(v.join('='))]));
   next();
 });
-app.use(express.static('public', { maxAge: '7d' }));
-app.use('/uploads', express.static(path.join(DATA_DIR, 'uploads'), { maxAge: '7d' }));
+// public/ lo sirve Cloudflare antes de llegar aquí y /uploads lo sirve src/worker.js desde Workers KV.
 app.use(express.urlencoded({ extended: false, limit: '200kb' }));
 app.use(express.json({ limit: '200kb' }));
 app.use(loadSession);
@@ -178,6 +178,19 @@ app.get('/sitemap.xml', (req, res) => {
 });
 app.get('/healthz', (_q, res) => { get('SELECT 1 AS ok'); res.json({ ok: true, version: process.env.APP_VERSION || 'dev' }); });
 
+// Enlace de un solo uso (60 min) para crear o recuperar un administrador. Lo usa scripts/create-admin.js
+// con la clave secreta SETUP_KEY (wrangler secret put SETUP_KEY). Sin clave configurada, no existe.
+app.post('/__setup-link', (req, res) => {
+  const key = process.env.SETUP_KEY || '', sent = String(req.get('authorization') || '').replace(/^Bearer /, '');
+  const ok = key.length >= 24 && crypto.timingSafeEqual(Buffer.from(sha(sent)), Buffer.from(sha(key)));
+  if (!ok || limited('setup:' + req.ip, 10, 60 * 60e3)) return res.status(404).end();
+  const user = String(req.body.user || '').trim();
+  if (!/^[a-zA-Z0-9._-]{3,40}$/.test(user)) return res.status(400).json({ ok: false, message: 'Usuario no válido (3 a 40 letras, números, punto, guion).' });
+  const t = token();
+  run('INSERT INTO setup_tokens (token_hash, username, expires) VALUES (?,?,?)', sha(t), user, Date.now() + 60 * 60e3);
+  res.json({ ok: true, url: `${req.protocol}://${req.get('host')}/admin/setup?t=${t}` });
+});
+
 app.use('/admin', admin);
 
 // Páginas nuevas creadas en el diseñador.
@@ -186,4 +199,4 @@ app.get('/:slug', (req, res, next) => { const p = pageBySlug(req.params.slug); i
 app.use((req, res) => res.status(404).send(V.layout(settings(), { title: 'No encontrado', body: V.message('Página no encontrada', 'La dirección no existe o fue retirada.', '/') })));
 app.use((err, req, res, _next) => { console.error(new Date().toISOString(), req.method, req.path, err); res.status(500).send(V.layout(settings(), { body: V.message('Algo salió mal', 'Intenta de nuevo en unos segundos.', '/') })); });
 
-app.listen(PORT, () => console.log(`Imagroup escuchando en :${PORT}`));
+app.listen(PORT);

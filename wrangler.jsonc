@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "imagroup",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-11-20",
+  "compatibility_flags": ["nodejs_compat"],
+  // Lista las imágenes de public/ para el selector del diseñador (no hay disco en Cloudflare).
+  "build": { "command": "node scripts/assets-manifest.js" },
+  // pdfkit normal lee sus fuentes del disco; la versión standalone las trae incluidas.
+  "alias": { "pdfkit": "./node_modules/pdfkit/js/pdfkit.standalone.js" },
+  "assets": { "directory": "./public", "binding": "ASSETS" },
+  "durable_objects": { "bindings": [{ "name": "SITE", "class_name": "Site" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Site"] }],
+  // Fotos subidas desde el panel (Workers KV: gratis y sin tarjeta; hasta 25 MB por archivo).
+  "kv_namespaces": [{ "binding": "UPLOADS", "id": "3a72f9fa87394c30b1b558575eaee531" }],
+  "vars": { "APP_VERSION": "cloudflare" },
+  "observability": { "enabled": true }
+}

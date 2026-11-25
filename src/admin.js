@@ -1,8 +1,8 @@
 import express from 'express';
 import multer from 'multer';
 import path from 'node:path';
-import crypto from 'node:crypto';
-import { all, get, run, settings, audit, DATA_DIR } from './db.js';
+import { all, get, run, settings, audit } from './db.js';
+import { kvStorage, randomName } from './files.js';
 import { checkPassword, hashPassword, passwordProblem, createSession, destroySession, requireAdmin, limited, sha } from './auth.js';
 import { h, money } from './views.js';
 import { mountWorkers, monthStar } from './workers.js';
@@ -10,10 +10,7 @@ import { mountBuilder, mountBuilderAdmin } from './builder.js';
 
 const r = express.Router();
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: path.join(DATA_DIR, 'uploads'),
-    filename: (_q, f, cb) => cb(null, crypto.randomBytes(8).toString('hex') + (path.extname(f.originalname).toLowerCase().match(/^\.(jpe?g|png|webp)$/) ? path.extname(f.originalname).toLowerCase() : '.bin')),
-  }),
+  storage: kvStorage((f) => randomName(path.extname(f.originalname).toLowerCase().match(/^\.(jpe?g|png|webp)$/) ? path.extname(f.originalname).toLowerCase() : '.bin')),
   limits: { fileSize: 4 * 1024 * 1024, files: 1 },
   fileFilter: (_q, f, cb) => cb(null, /^image\/(jpeg|png|webp)$/.test(f.mimetype)),
 });

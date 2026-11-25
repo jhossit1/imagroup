@@ -1,20 +1,15 @@
 // Certificado A4 horizontal: logo de la empresa, sello del nivel, firmas y QR de verificación.
-import fs from 'node:fs';
-import path from 'node:path';
 import PDFDocument from 'pdfkit';
 import QRCode from 'qrcode';
-import { DATA_DIR } from './db.js';
+import { sendPdf } from './files.js';
 import { levelOf, MES } from './method.js';
 
 const INK = '#14202c', BLUE = '#1a5f99', DEEP = '#14324f', GOLD = '#c9a24a', LEAF = '#3d8a37', MUTED = '#5d6874';
 
-// pdfkit solo lee PNG o JPG: para los logos .webp del sitio se usa su copia .png.
-function img(p) {
-  if (!p) return null;
-  let f = p.startsWith('/uploads/') ? path.join(DATA_DIR, 'uploads', path.basename(p)) : path.resolve('public', p.replace(/^\/+/, ''));
-  if (f.endsWith('.webp')) f = f.replace(/\.webp$/, '.png');
-  return /\.(png|jpe?g)$/i.test(f) && fs.existsSync(f) ? f : null;
-}
+// Imágenes ya cargadas por files.loadImages (ruta -> data URI) antes de dibujar el certificado.
+let IMGS = new Map();
+const img = (p) => (p && IMGS.get(p)) || null;
+export const certImages = (d) => [d.co.logo, d.co.signature, d.co.signature2];
 // Cinco estrellas con relleno parcial (4.5 = cuatro y media).
 const starPts = (cx, cy, R) => Array.from({ length: 10 }, (_, i) => { const a = -Math.PI / 2 + (i * Math.PI) / 5, r = i % 2 ? R * .45 : R; return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; });
 export function starsPdf(doc, x, y, size, v, color, empty = '#d6dde5') {
@@ -27,11 +22,12 @@ export function starsPdf(doc, x, y, size, v, color, empty = '#d6dde5') {
 }
 const longDate = (iso) => { const [y, m, d] = iso.slice(0, 10).split('-'); return `${+d} de ${MES[+m - 1]} de ${y}`; };
 
-export function certificatePdf(out, { c, w, co, ev, url }) {
+export function certificatePdf(out, { c, w, co, ev, url }, imgs = new Map()) {
+  IMGS = imgs;
   let rt = null; try { rt = c.ratings ? JSON.parse(c.ratings) : null; } catch { rt = null; }
   if (rt && !rt.some((r) => r.v)) rt = null;
   const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 0, info: { Title: `${c.title} · ${w.name}`, Author: co.name, Subject: `Certificado ${c.code}` } });
-  doc.pipe(out);
+  sendPdf(out, doc);
   const W = doc.page.width, H = doc.page.height, cx = W / 2;
 
   // Fondo y marcos
